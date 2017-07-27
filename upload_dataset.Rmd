@@ -1,0 +1,298 @@
+---
+title: "Upload Dataset"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: cerulean
+    logo: undp48.png
+    orientation: rows
+    runtime: shiny
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r Preloaded Datasets, echo=FALSE}
+
+# Dependencies
+library(shinyBS)
+library(data.table)
+library(xlsx)
+library(DT)
+becca.data <- new.env()
+becca.corpus <- new.env()
+becca.texts <- new.env()
+becca.subsets <- new.env()
+up.values <- reactiveValues(del.message = NULL)
+up.env <- new.env()
+
+# Dud button for toggleModals
+output$inv <- renderUI(actionButton("invisibutton", "Invisibutton"))
+
+wd <- getwd()
+dataset <- list.files(paste0(wd, "/data/"))
+
+for (d in 1:length(dataset)) {
+  
+  files <- list.files(paste0(wd, "/data/", dataset[d], "/"))
+  files <- files[grep(".RData", files)]
+  for (i in 1:length(files))
+    load(paste0(wd,"/data/", dataset[d], "/", files[i]))
+  
+  assign(paste0(dataset[d],"_corpus"), corpus, pos = becca.corpus)
+  assign(paste0(dataset[d],"_texts_eng"), texts_eng, pos = becca.texts)
+  assign(paste0(dataset[d],"_texts_org"), texts_org, pos = becca.texts)
+  assign(paste0(dataset[d],"_titles_eng"), titles_eng, pos = becca.texts)
+  assign(paste0(dataset[d],"_titles_org"), titles_org, pos = becca.texts)
+  assign(paste0(dataset[d],".subsets"), get(paste0(dataset[d],".subsets")), pos = becca.subsets)
+  
+  data <- clean
+  assign(dataset[d], data, pos = becca.data)
+}
+```
+
+Upload Dataset
+=====================================
+
+Upload Dataset {.sidebar}
+-------------------------------------
+
+```{r}
+
+# Upload dataset button
+selectInput("up_dataset",
+            "Loaded datasets",
+            choices = ls(becca.data))
+
+# Delete Dataset Process
+actionButton("up_delete", "Delete Dataset")
+
+bsModal("up_confirm", "Delete Dataset?", "up_delete", size = "small",
+                HTML("Do you definitely want to delete this dataset?"),
+                actionButton("up_yes", "Yes"),
+                actionButton("up_no", "No")
+        )
+
+bsModal("up_del_outcome", "Delete Dataset", trigger = "invisibutton", size = "small", renderText(up.values$del.message))
+
+hr()
+
+# Deletion
+observeEvent(input$up_yes,{
+  
+  # Close window
+  toggleModal(session, "up_confirm", toggle = "close")
+  
+  # Is dataset one of the original preloaded?
+  org.data <- c("moldova", "kyrgyzstan", "unicef", "serbia", "tajikistan", "yemen")
+  if (any(org.data == input$up_dataset)) {
+    #If so, throw error.
+    up.values$del.message <- paste0("Original preloaded datasets cannot be deleted. (", paste(org.data, collapse = ", "), ")")
+  } else {
+    #If not, Delete dataset. (In R sesssion and working dir.)
+    name <- input$up_dataset
+    rm(name, envir = becca.data)
+    rm(paste0(name, "_corpus"), envir = becca.corpus)
+    texts <- grep(paste0(name, "_t"), ls(becca.texts), value = TRUE)
+    rm(list = texts, envir = becca.texts)
+    rm(paste0(name,".subsets", envir = becca.subsets))
+    unlink(paste0(getwd(), "/data/", name), recursive = TRUE)
+    up.values$del.message <- "Dataset Deleted!"
+  }
+  # Open Message
+  toggleModal(session, "up_del_outcome", toggle = "open")
+})
+
+
+```
+
+Upload Dataset {.tabset}
+-------------------------------------
+
+### Dataset Overview
+
+```{r Dataset Overview}
+
+# Key Statistics Builder
+  output$up_keystats <- renderTable({
+    view <- get(input$up_dataset, envir = becca.data)
+    subsets <- get(paste0(input$up_dataset, ".subsets"), envir = becca.subsets)
+    for (i in 1:length(subsets))
+      assign(names(subsets)[i], subsets[[i]])
+    
+    x <- matrix(data = c(dim(view)[1], 
+                    dim(view)[2], 
+                    paste0(dim(triads)[2], " (", dim(triads)[2]/4, ")"), 
+                    ifelse(exists("dyads"), paste0(dim(dyads)[2], " (", (dim(dyads)[2]/3)*2, ")"), 0), 
+                    ifelse(exists("stones"), paste0(dim(stones)[2], " (", dim(stones)[2]/2, ")"), 0),
+                    dim(questions)[2],
+                    dim(descriptors)[2],
+                    ifelse(exists("respondents"), dim(respondents)[2], 0),
+                    ifelse(exists("collectors"), dim(collector)[2], 0),
+                    ifelse(match("texts_eng", names(view), nomatch = FALSE), "Yes", "No"),
+                    ifelse(match("titles_org", names(view), nomatch = FALSE), "Yes", "No")), ncol = 1, dimnames = list(c("Observations", "Variables", "Triads", "Dyads", "Stones", "Questions", "Descriptors", "Respondents", "Collector", "Translation?", "Titles?"), "Count"))
+  }, align = rep("l", 2))
+
+fluidRow(
+  column(strong("Key Statistics"), tableOutput("up_keystats"), width = 6)
+)
+```
+
+### Dataset Breakdown
+
+```{r Dataset Breakdown}
+
+observeEvent(input$up_dataset,{
+  # Variable list by signifer
+  # How many of each
+  # n
+  # Summary of selected variable
+  
+  view <- get(input$up_dataset, envir = becca.data)
+  subsets <- get(paste0(input$up_dataset,".subsets"), envir = becca.subsets)
+  
+  for (t in 1:length(subsets))
+    assign(names(subsets)[t], subsets[[t]])
+})
+
+output$up_table <- renderDataTable({
+  source("dataset_breakdown.R")
+  view <- get(input$up_dataset, envir = becca.data)
+  view <- data.breakdown(view)
+  up.env$breakdown <- view[[1]]
+  view[[1]]
+}, rownames = TRUE, options = list(scrollY = "500px"), selection = "single")
+
+# Edit selected row
+
+bsModal("up_edit", "Edit Variable", trigger = "invisibutton", size = "large", uiOutput("editor"))
+
+observeEvent(req(input$up_table_rows_selected), {
+  
+  output$editor <- renderUI({
+    
+    breakdown <- up.env$breakdown
+    num <- input$up_table_rows_selected
+    data <- get(input$up_dataset, envir = becca.data)
+    x <- data[, num]
+    
+    list(
+      strong(names(data)[num]),
+      br(),
+      p("This is a ", strong(breakdown[num, 1]), "variable. Reassign as..."),
+      radioButtons("up_edit_datatype", title = NULL, choices = c("Factor", "Binomial", "Continuous", "Date", "Identifier"))
+    )
+  })
+  
+  toggleModal(session, "up_edit", toggle = "open")
+})
+
+# Panel Viewing
+
+strong("Variable Breakdown")
+
+dataTableOutput("up_table")
+
+```
+
+### Upload New
+
+```{r New Dataset Form}
+
+textInput("up_name", "Dataset Name", placeholder = "e.g. 'moldova'")
+
+strong("Variable names")
+
+p("In order for BECCA to accurately locate the key variables on which its tools depend, please type the ", strong("exact "), "names of the following variables as given in your .csv file (Case-sensitive).")
+
+textInput("up_story", "*Story Variable", placeholder = "your.experience")
+
+textInput("up_title", "Story Title Variable", placeholder = "story.title")
+
+textInput("up_positivity", "Positivity Variable", placeholder = "Q1.Feeling")
+
+textInput("up_date", "Entry Date Variable", placeholder = "EntryDate")
+
+textInput("up_format", "Date Format", placeholder = "DD/MM/YYYY")
+
+radioButtons("up_delim", "Delimiter (.csv and .txt files only)",
+             choices = c("comma" = ",", 
+                         "tab" = "\t", 
+                         "semicolon" = ";", 
+                         "space" = " "))
+
+hr()
+
+radioButtons("up_translate", "Translate to English?", choices = c("Yes", "No", "Translation included"))
+
+conditionalPanel(condition = "input.up_translate == 'Translation included'",
+                 textInput("up_trans_story", "Translated Stories Variable", 
+                           placeholder = "FragmentEng"),
+                 textInput("up_trans_title", "Translated Titles Variable", 
+                           placeholder = "TitleEng"),
+                 p("These only need to be completed if variables exist in the dataset for ", strong("both "), "the original entries and translated ones, and you would like to have the option of analysing both. Otherwise, the choose 'Yes' or 'No' to automated translation, depending on whether or not the texts are already in the language you wish to use."))
+
+p("If you choose to translate the texts into English, you will still be able to use the original language texts in any of BECCA's instruments. Translation can be time consuming, increasingly so with larger corpus. As a guideline, the 'moldova' dataset contains 519 observations, and took approximately 8 minutes to translate all micronarratives and titles. BECCA uses Yandex Translate's API to perform the translation, so an internet connection is required. Naturally, automated translation will never be 100% accurate/interpretable.")
+
+hr()
+
+fileInput("up_new", "Upload Dataset", accept = ".csv")
+
+observeEvent(input$up_new,{
+    
+  # Read in data
+  filetype <- strsplit(fnamesave, "\\.")[[2]]
+  new <- switch(filetype,
+                "csv" = read.csv(input$up_new$datapath, header = TRUE, encoding = "utf-8", sep = input$up_delim),
+                "txt" = read.delim(input$up_new$datapath, header = TRUE, encoding = "utf-8", sep = input$up_delim),
+                "xls" = read.xlsx2(input$up_new$datapath, 1, header = TRUE, encoding = "utf-8"),
+                "xlsx" = read.xlsx2(input$up_new$datapath, 1, header = TRUE, encoding = "utf-8"))
+  
+  # Read spaces as fullstops.
+  text.name <- sub(" ", ".", input$up_story)
+  title.name <- sub(" ", ".", input$up_title)
+  pos.name <- sub(" ", ".", input$up_positivity)
+  date.name <- sub(" ", ".", input$up_date)
+  
+  # Vaildate Dataset
+  
+  validate(
+    # Require that new dataset name is unique
+    need(!match(input$up_name, ls(becca.data)), paste0("There is already a dataset called '", input$up_name, "'. Please choose another.")),
+    # Check name of story variable is correct.
+    need(match(text.name, names(new)), paste0("There is no variable in the dataset called '", text.name, "'. Check spelling!")),
+    # Check name of story title variable is correct.
+    need(match(title.name, names(new)), paste0("There is no variable in the dataset called '", title.name, "'. Check spelling!")),
+    # Check name of date variable is correct.
+    need(match(date.name, names(new)), paste0("There is no variable in the dataset called '", date.name, "'. Check spelling!"))
+  )
+  
+  # Data Cleaning
+  source("data_cleaning.R")
+  new <- clean.data(new,
+                    translate = input$up_translate,
+                    textVar = text.name,
+                    titleVar = title.name,
+                    posVar = pos.name,
+                    dateVar = date.name,
+                    dateFormat = input$up_format)
+  
+  assign(input$up_name, new, where = becca.data)
+  
+  # Sort Signifiers
+  source("sort_signifiers.R")
+  assign(paste0(input$up_name, ".subsets"), sigtypes(new), pos = becca.subsets)
+})
+
+```
+
+### Guidelines for uploading
+
+```{r}
+output$test <- renderPrint({
+  rows <- input$up_table_rows_selected
+  if (length(rows))
+    cat(rows, sep = ", ")
+})
+
+verbatimTextOutput("test")
+```
+

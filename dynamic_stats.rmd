@@ -1,0 +1,844 @@
+---
+title: "Common Deliverable"
+output: 
+ flexdashboard::flex_dashboard:
+    orientation: rows
+    runtime: shiny
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r, include=FALSE}
+library(shiny)
+library(shinyBS)
+
+##  Fix triad, stones and dyads drop downs
+##  Stop the drop downs from closing, and opening x1 factor when option is selected.
+##  Make Descriptor levels display.
+##  Make Proportional
+
+ui <- shinyUI(fluidPage(
+  
+  headerPanel("Descriptive Statistics"),
+  
+  sidebarLayout(
+    
+    sidebarPanel(
+      selectInput(inputId = "unit",
+                  label = "Number/Percentage",
+                  choices = c("Number of Stories","Percentage")),
+      hr(),
+      
+      ##  X Variables (rows)
+      
+      h4("X Variables (rows)"),
+      
+        ##  X1
+      
+      selectInput(inputId = "x1",
+                  label = "X Variable 1",
+                  choices = c("Select","Triads","Dyads","Stones","Questions","Descriptors")),
+      conditionalPanel(condition = "input.x1 =='Questions' || input.x1 == 'Descriptors'",
+      bsCollapse(
+        bsCollapsePanel(title = "Factor",
+                        uiOutput("x1out")),
+        bsCollapsePanel(title = "Level",
+                        uiOutput("x_q1_factor")),
+        id = "x1_sig_type",
+        multiple = FALSE,
+        open = NULL)),
+      
+        ##  X2
+      
+      conditionalPanel(condition = "input.x1 != 'Select'",
+                       selectInput(inputId = "x2",
+                                   label = "X Variable 2",
+                                   choices = c("Select","Triads","Dyads","Stones","Questions","Descriptors"))),
+      conditionalPanel(condition = "input.x2 =='Questions' || input.x2 == 'Descriptors'",
+                       bsCollapse(
+                         bsCollapsePanel(title = "Factor",
+                                         uiOutput("x2out")),
+                         bsCollapsePanel(title = "Level",
+                                         uiOutput("x_q2_factor")),
+                         id = "x2_sig_type",
+                         multiple = FALSE,
+                         open = NULL)),
+      
+        ##  X3
+      
+      conditionalPanel(condition = "input.x2 != 'Select'",
+                       selectInput(inputId = "x3",
+                                   label = "X Variable 3",
+                                   choices = c("Select","Triads","Dyads","Stones","Questions","Descriptors"))),
+      conditionalPanel(condition = "input.x3 =='Questions' || input.x3 == 'Descriptors'",
+                       bsCollapse(
+                         bsCollapsePanel(title = "Factor",
+                                         uiOutput("x3out")),
+                         bsCollapsePanel(title = "Level",
+                                         uiOutput("x_q3_factor")),
+                         id = "x3_sig_type",
+                         multiple = FALSE,
+                         open = NULL)),
+      
+        ##  X4
+      
+      conditionalPanel(condition = "input.x3 != 'Select'",
+                       selectInput(inputId = "x4",
+                                   label = "X Variable 4",
+                                   choices = c("Select","Triads","Dyads","Stones","Questions","Descriptors"))),
+      conditionalPanel(condition = "input.x4 =='Questions' || input.x4 == 'Descriptors'",
+                       bsCollapse(
+                         bsCollapsePanel(title = "Factor",
+                                         uiOutput("x4out")),
+                         bsCollapsePanel(title = "Level",
+                                         uiOutput("x_q4_factor")),
+                         id = "x4_sig_type",
+                         multiple = FALSE,
+                         open = NULL)),
+      hr(),
+      
+      ##  Y Variables (columns)
+      
+        ##  Y1
+      
+      h4("Y Variables (columns)"),
+      selectInput(inputId = "y1",
+                  label = "Y Variable 1",
+                  choices = c("Select","Triads","Dyads","Stones","Questions","Descriptors")),
+      conditionalPanel(condition = "input.y1 =='Questions' || input.y1 == 'Descriptors'",
+      bsCollapse(
+        bsCollapsePanel(title = "Factor",
+                        uiOutput("y1out")),
+        bsCollapsePanel(title = "Level",
+                        uiOutput("y_q1_factor")),
+        id = "y_sig_type",
+        multiple = FALSE,
+        open = NULL)),
+      
+        ##  Y2
+      
+      conditionalPanel(condition = "input.y1 != 'Select'",
+                       selectInput(inputId = "y2",
+                                   label = "Y Variable 2",
+                                   choices = c("Select","Triads","Dyads","Stones","Questions","Descriptors"))),
+      conditionalPanel(condition = "input.y2 =='Questions' || input.y2 == 'Descriptors'",
+                       bsCollapse(
+                         bsCollapsePanel(title = "Factor",
+                                         uiOutput("y2out")),
+                         bsCollapsePanel(title = "Level",
+                                         uiOutput("y_q2_factor")),
+                         id = "y2_sig_type",
+                         multiple = FALSE,
+                         open = NULL)),
+      
+        ##  Y3
+      
+      conditionalPanel(condition = "input.y2 != 'Select'",
+                       selectInput(inputId = "y3",
+                                   label = "Y Variable 3",
+                                   choices = c("Select","Triads","Dyads","Stones","Questions","Descriptors"))),
+      conditionalPanel(condition = "input.y3 =='Questions' || input.y3 == 'Descriptors'",
+                       bsCollapse(
+                         bsCollapsePanel(title = "Factor",
+                                         uiOutput("y3out")),
+                         bsCollapsePanel(title = "Level",
+                                         uiOutput("y_q3_factor")),
+                         id = "y3_sig_type",
+                         multiple = FALSE,
+                         open = NULL)),
+      
+        ##  Y4
+      
+      conditionalPanel(condition = "input.y3 != 'Select'",
+                       selectInput(inputId = "y4",
+                                   label = "Y Variable 4",
+                                   choices = c("Select","Triads","Dyads","Stones","Questions","Descriptors"))),
+      conditionalPanel(condition = "input.y4 =='Questions' || input.y4 == 'Descriptors'",
+                       bsCollapse(
+                         bsCollapsePanel(title = "Factor",
+                                         uiOutput("y4out")),
+                         bsCollapsePanel(title = "Level",
+                                         uiOutput("y_q4_factor")),
+                         id = "y4_sig_type",
+                         multiple = FALSE,
+                         open = NULL))),
+    
+      mainPanel(tableOutput("stats"))
+    )))
+  
+  server <- shinyServer(function(input,output,session){
+    
+    ##  Variable Selection
+    
+    output$unit <- renderText({input$unit})
+    
+    output$x1out <- renderUI({switch(input$x1,
+                                     "Triads" = checkboxGroupInput(inputId = "x_t1",
+                                                                   label = "X Triad 1",
+                                                                   choices = names(triads)),
+                                     "Dyads" = checkboxGroupInput(inputId = "x_d1",
+                                                                  label = "X Dyad 1",
+                                                                  choices = names(dyads)),
+                                     "Stones" = checkboxGroupInput(inputId = "x_s1",
+                                                                   label = "X Stone 1",
+                                                                   choices = names(stones)),
+                                     "Questions" = selectInput(inputId = "x_q1",
+                                                               label = "X Question 1",
+                                                               choices = c("Select",
+                                                                           "Positivity (Factor)",
+                                                                           "Frequency",
+                                                                           "Who should hear?",
+                                                                           "Who influenced?",
+                                                                           "Story Involves",
+                                                                           "Who Impacted Experience?"),
+                                                               selected = "Select"),
+                                     "Descriptors" = selectInput(inputId = "x_dq1",
+                                                                 label = "X Descriptor 1",
+                                                                 choices = c("Select",
+                                                                             "Age",
+                                                                             "Gender",
+                                                                             "Education",
+                                                                             "Travel Abroad For?",
+                                                                             "Rural/Urban",
+                                                                             "Who Lives With You?",
+                                                                             "Daily Expenses",
+                                                                             "Region"))
+    )
+    })
+    output$x1_chosen <- renderText({input$x1})
+    
+    output$x2out <- renderUI({switch(input$x2,
+                                     "Triads" = checkboxGroupInput(inputId = "x_t2",
+                                                                   label = "X Triad 2",
+                                                                   choices = names(triads)),
+                                     "Dyads" = checkboxGroupInput(inputId = "x_d2",
+                                                                  label = "X Dyad 2",
+                                                                  choices = names(dyads)),
+                                     "Stones" = checkboxGroupInput(inputId = "x_s2",
+                                                                   label = "X Stone 2",
+                                                                   choices = names(stones)),
+                                     "Questions" = selectInput(inputId = "x_q2",
+                                                               label = "X Question 2",
+                                                               choices = c("Select",
+                                                                           "Positivity (Factor)",
+                                                                           "Frequency",
+                                                                           "Who should hear?",
+                                                                           "Who influenced?",
+                                                                           "Story Involves",
+                                                                           "Who Impacted Experience?"),
+                                                               selected = "Select"),
+                                     "Descriptors" = selectInput(inputId = "x_dq2",
+                                                                 label = "X Descriptor 2",
+                                                                 choices = c("Select",
+                                                                             "Age",
+                                                                             "Gender",
+                                                                             "Education",
+                                                                             "Travel Abroad For?",
+                                                                             "Rural/Urban",
+                                                                             "Who Lives With You?",
+                                                                             "Daily Expenses",
+                                                                             "Region"))
+    )
+    })
+    output$x2_chosen <- renderText({input$x2})
+    
+    output$x3out <- renderUI({switch(input$x3,
+                                     "Triads" = checkboxGroupInput(inputId = "x_t3",
+                                                                   label = "X Triad 3",
+                                                                   choices = names(triads)),
+                                     "Dyads" = checkboxGroupInput(inputId = "x_d3",
+                                                                  label = "X Dyad 3",
+                                                                  choices = names(dyads)),
+                                     "Stones" = checkboxGroupInput(inputId = "x_s3",
+                                                                   label = "X Stone 3",
+                                                                   choices = names(stones)),
+                                     "Questions" = selectInput(inputId = "x_q3",
+                                                               label = "X Question 3",
+                                                               choices = c("Select",
+                                                                           "Positivity (Factor)",
+                                                                           "Frequency",
+                                                                           "Who should hear?",
+                                                                           "Who influenced?",
+                                                                           "Story Involves",
+                                                                           "Who Impacted Experience?"),
+                                                               selected = "Select"),
+                                     "Descriptors" = selectInput(inputId = "x_dq3",
+                                                                 label = "X Descriptor 3",
+                                                                 choices = c("Select",
+                                                                             "Age",
+                                                                             "Gender",
+                                                                             "Education",
+                                                                             "Travel Abroad For?",
+                                                                             "Rural/Urban",
+                                                                             "Who Lives With You?",
+                                                                             "Daily Expenses",
+                                                                             "Region"))
+    )
+    })
+    output$x3_chosen <- renderText({input$x3})
+    
+    output$x4out <- renderUI({switch(input$x4,
+                                     "Triads" = checkboxGroupInput(inputId = "x_t4",
+                                                                   label = "X Triad 4",
+                                                                   choices = names(triads)),
+                                     "Dyads" = checkboxGroupInput(inputId = "x_d4",
+                                                                  label = "X Dyad 4",
+                                                                  choices = names(dyads)),
+                                     "Stones" = checkboxGroupInput(inputId = "x_s4",
+                                                                   label = "X Stone 4",
+                                                                   choices = names(stones)),
+                                     "Questions" = selectInput(inputId = "x_q4",
+                                                               label = "X Question 4",
+                                                               choices = c("Select",
+                                                                           "Positivity (Factor)",
+                                                                           "Frequency",
+                                                                           "Who should hear?",
+                                                                           "Who influenced?",
+                                                                           "Story Involves",
+                                                                           "Who Impacted Experience?"),
+                                                               selected = "Select"),
+                                     "Descriptors" = selectInput(inputId = "x_dq4",
+                                                                 label = "X Descriptor 4",
+                                                                 choices = c("Select",
+                                                                             "Age",
+                                                                             "Gender",
+                                                                             "Education",
+                                                                             "Travel Abroad For?",
+                                                                             "Rural/Urban",
+                                                                             "Who Lives With You?",
+                                                                             "Daily Expenses",
+                                                                             "Region"))
+    )
+    })
+    output$x4_chosen <- renderText({input$x4})
+    
+    output$y1out <- renderUI({switch(input$y1,
+                                     "Triads" = checkboxGroupInput(inputId = "y_t1",
+                                                                   label = "Y Triad 1",
+                                                                   choices = names(triads)),
+                                     "Dyads" = checkboxGroupInput(inputId = "y_d1",
+                                                                  label = "Y Dyad 1",
+                                                                  choices = names(dyads)),
+                                     "Stones" = checkboxGroupInput(inputId = "y_s1",
+                                                                   label = "Y Stone 1",
+                                                                   choices = names(stones)),
+                                     "Questions" = selectInput(inputId = "y_q1",
+                                                               label = "Y Question 1",
+                                                               choices = c("Select",
+                                                                           "Positivity (Factor)",
+                                                                           "Frequency",
+                                                                           "Who should hear?",
+                                                                           "Who influenced?",
+                                                                           "Story Involves",
+                                                                           "Who Impacted Experience?")),
+                                     "Descriptors" = selectInput(inputId = "y_dq1",
+                                                                 label = "Y Descriptor 1",
+                                                                 choices = c("Select",
+                                                                             "Age",
+                                                                             "Gender",
+                                                                             "Education",
+                                                                             "Travel Abroad For?",
+                                                                             "Rural/Urban",
+                                                                             "Who Lives With You?",
+                                                                             "Daily Expenses",
+                                                                             "Region"))
+    )
+    })
+    
+    output$y2out <- renderUI({switch(input$y2,
+                                     "Triads" = checkboxGroupInput(inputId = "y_t2",
+                                                                   label = "Y Triad 2",
+                                                                   choices = names(triads)),
+                                     "Dyads" = checkboxGroupInput(inputId = "y_d2",
+                                                                  label = "X Dyad 2",
+                                                                  choices = names(dyads)),
+                                     "Stones" = checkboxGroupInput(inputId = "y_s2",
+                                                                   label = "Y Stone 2",
+                                                                   choices = names(stones)),
+                                     "Questions" = selectInput(inputId = "y_q2",
+                                                               label = "X Question 2",
+                                                               choices = c("Select",
+                                                                           "Positivity (Factor)",
+                                                                           "Frequency",
+                                                                           "Who should hear?",
+                                                                           "Who influenced?",
+                                                                           "Story Involves",
+                                                                           "Who Impacted Experience?"),
+                                                               selected = "Select"),
+                                     "Descriptors" = selectInput(inputId = "y_dq2",
+                                                                 label = "Y Descriptor 2",
+                                                                 choices = c("Select",
+                                                                             "Age",
+                                                                             "Gender",
+                                                                             "Education",
+                                                                             "Travel Abroad For?",
+                                                                             "Rural/Urban",
+                                                                             "Who Lives With You?",
+                                                                             "Daily Expenses",
+                                                                             "Region"))
+    )
+    })
+    output$y2_chosen <- renderText({input$y2})
+    
+    output$y3out <- renderUI({switch(input$y3,
+                                     "Triads" = checkboxGroupInput(inputId = "y_t3",
+                                                                   label = "Y Triad 3",
+                                                                   choices = names(triads)),
+                                     "Dyads" = checkboxGroupInput(inputId = "y_d3",
+                                                                  label = "Y Dyad 3",
+                                                                  choices = names(dyads)),
+                                     "Stones" = checkboxGroupInput(inputId = "y_s3",
+                                                                   label = "Y Stone 3",
+                                                                   choices = names(stones)),
+                                     "Questions" = selectInput(inputId = "y_q3",
+                                                               label = "Y Question 3",
+                                                               choices = c("Select",
+                                                                           "Positivity (Factor)",
+                                                                           "Frequency",
+                                                                           "Who should hear?",
+                                                                           "Who influenced?",
+                                                                           "Story Involves",
+                                                                           "Who Impacted Experience?"),
+                                                               selected = "Select"),
+                                     "Descriptors" = selectInput(inputId = "y_dq3",
+                                                                 label = "Y Descriptor 3",
+                                                                 choices = c("Select",
+                                                                             "Age",
+                                                                             "Gender",
+                                                                             "Education",
+                                                                             "Travel Abroad For?",
+                                                                             "Rural/Urban",
+                                                                             "Who Lives With You?",
+                                                                             "Daily Expenses",
+                                                                             "Region"))
+    )
+    })
+    output$y3_chosen <- renderText({input$y3})
+    
+    output$y4out <- renderUI({switch(input$y4,
+                                     "Triads" = checkboxGroupInput(inputId = "y_t4",
+                                                                   label = "Y Triad 4",
+                                                                   choices = names(triads)),
+                                     "Dyads" = checkboxGroupInput(inputId = "y_d4",
+                                                                  label = "Y Dyad 4",
+                                                                  choices = names(dyads)),
+                                     "Stones" = checkboxGroupInput(inputId = "y_s4",
+                                                                   label = "Y Stone 4",
+                                                                   choices = names(stones)),
+                                     "Questions" = selectInput(inputId = "y_q4",
+                                                               label = "Y Question 4",
+                                                               choices = c("Select",
+                                                                           "Positivity (Factor)",
+                                                                           "Frequency",
+                                                                           "Who should hear?",
+                                                                           "Who influenced?",
+                                                                           "Story Involves",
+                                                                           "Who Impacted Experience?"),
+                                                               selected = "Select"),
+                                     "Descriptors" = selectInput(inputId = "y_dq4",
+                                                                 label = "Y Descriptor 4",
+                                                                 choices = c("Select",
+                                                                             "Age",
+                                                                             "Gender",
+                                                                             "Education",
+                                                                             "Travel Abroad For?",
+                                                                             "Rural/Urban",
+                                                                             "Who Lives With You?",
+                                                                             "Daily Expenses",
+                                                                             "Region"))
+    )
+    })
+    output$y4_chosen <- renderText({input$y4})
+    
+    ##  Tier 2 Level Selection
+    
+      ##  X Variables (rows)
+    
+      ##  X1
+    
+    x_q1 <- renderText({switch(input$x_q1,
+                            "Positivity (Factor)"= "1",
+                            "Frequency" = "2",
+                            "Who should hear?" = "3",
+                            "Who influenced?" = "4",
+                            "Story Involves" = "5",
+                            "Who Impacted Experience?" = "6")})
+    x_dq1 <- renderText({switch(input$x_dq1,
+                            "Age" = "1",
+                            "Gender" = "2",
+                            "Education" = "3",
+                            "Travel Abroad For?" = "4",
+                            "Rural/Urban" = "5",
+                            "Who Lives With You?" = "6",
+                            "Daily Expenses" = "7",
+                            "Region" = "8")})
+    output$x_q1_factor <- renderUI({
+      checkboxGroupInput(inputId = "x_q1_level",
+                         label = "X Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^Q",x_q1(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^Q",x_q1(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^Q",x_q1(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^Q",x_q1(),"."),names(clean),value = TRUE)]))})
+    })
+    output$x_dq1_factor <- renderUI({
+      checkboxGroupInput(inputId = "x_dq1_level",
+                         label = "X Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^DQ",x_dq1(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^DQ",x_dq1(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^DQ",x_dq1(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^DQ",x_dq1(),"."),names(clean),value = TRUE)]))})
+    })
+    
+      ##  X2
+    
+    x_q2 <- renderText({switch(input$x_q2,
+                               "Positivity (Factor)"= "1",
+                               "Frequency" = "2",
+                               "Who should hear?" = "3",
+                               "Who influenced?" = "4",
+                               "Story Involves" = "5",
+                               "Who Impacted Experience?" = "6")})
+    x_dq2 <- renderText({switch(input$x_dq2,
+                                "Age" = "1",
+                                "Gender" = "2",
+                                "Education" = "3",
+                                "Travel Abroad For?" = "4",
+                                "Rural/Urban" = "5",
+                                "Who Lives With You?" = "6",
+                                "Daily Expenses" = "7",
+                                "Region" = "8")})
+    output$x_q2_factor <- renderUI({
+      checkboxGroupInput(inputId = "x_q2_level",
+                         label = "X Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^Q",x_q2(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^Q",x_q2(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^Q",x_q2(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^Q",x_q2(),"."),names(clean),value = TRUE)]))})
+    })
+    output$x_dq2_factor <- renderUI({
+      checkboxGroupInput(inputId = "x_dq2_level",
+                         label = "X Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^DQ",x_dq2(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^DQ",x_dq2(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^DQ",x_dq2(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^DQ",x_dq2(),"."),names(clean),value = TRUE)]))})
+    })
+    
+      ##  X3
+    
+    x_q3 <- renderText({switch(input$x_q3,
+                               "Positivity (Factor)"= "1",
+                               "Frequency" = "2",
+                               "Who should hear?" = "3",
+                               "Who influenced?" = "4",
+                               "Story Involves" = "5",
+                               "Who Impacted Experience?" = "6")})
+    x_dq3 <- renderText({switch(input$x_dq3,
+                                "Age" = "1",
+                                "Gender" = "2",
+                                "Education" = "3",
+                                "Travel Abroad For?" = "4",
+                                "Rural/Urban" = "5",
+                                "Who Lives With You?" = "6",
+                                "Daily Expenses" = "7",
+                                "Region" = "8")})
+    output$x_q3_factor <- renderUI({
+      checkboxGroupInput(inputId = "x_q3_level",
+                         label = "X Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^Q",x_q3(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^Q",x_q3(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^Q",x_q3(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^Q",x_q3(),"."),names(clean),value = TRUE)]))})
+    })
+    output$x_dq3_factor <- renderUI({
+      checkboxGroupInput(inputId = "x_dq3_level",
+                         label = "X Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^DQ",x_dq3(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^DQ",x_dq3(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^DQ",x_dq3(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^DQ",x_dq3(),"."),names(clean),value = TRUE)]))})
+    })
+    
+      ##  X4
+    
+    x_q4 <- renderText({switch(input$x_q4,
+                               "Positivity (Factor)"= "1",
+                               "Frequency" = "2",
+                               "Who should hear?" = "3",
+                               "Who influenced?" = "4",
+                               "Story Involves" = "5",
+                               "Who Impacted Experience?" = "6")})
+    x_dq4 <- renderText({switch(input$x_dq4,
+                                "Age" = "1",
+                                "Gender" = "2",
+                                "Education" = "3",
+                                "Travel Abroad For?" = "4",
+                                "Rural/Urban" = "5",
+                                "Who Lives With You?" = "6",
+                                "Daily Expenses" = "7",
+                                "Region" = "8")})
+    output$x_q4_factor <- renderUI({
+      checkboxGroupInput(inputId = "x_q4_level",
+                         label = "X Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^Q",x_q4(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^Q",x_q4(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^Q",x_q4(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^Q",x_q4(),"."),names(clean),value = TRUE)]))})
+    })
+    output$x_dq4_factor <- renderUI({
+      checkboxGroupInput(inputId = "x_dq4_level",
+                         label = "X Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^DQ",x_dq4(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^DQ",x_dq4(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^DQ",x_dq4(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^DQ",x_dq4(),"."),names(clean),value = TRUE)]))})
+    })
+    
+    ##  Y Variables (columns)
+    
+      ##  Y1
+    
+    y_q1 <- renderText({switch(input$y_q1,
+                               "Positivity (Factor)"= "1",
+                               "Frequency" = "2",
+                               "Who should hear?" = "3",
+                               "Who influenced?" = "4",
+                               "Story Involves" = "5",
+                               "Who Impacted Experience?" = "6")})
+    y_dq1 <- renderText({switch(input$y_dq1,
+                                "Age" = "1",
+                                "Gender" = "2",
+                                "Education" = "3",
+                                "Travel Abroad For?" = "4",
+                                "Rural/Urban" = "5",
+                                "Who Lives With You?" = "6",
+                                "Daily Expenses" = "7",
+                                "Region" = "8")})
+    output$y_q1_factor <- renderUI({
+      checkboxGroupInput(inputId = "y_q1_level",
+                         label = "Y Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^Q",y_q1(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^Q",y_q1(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^Q",y_q1(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^Q",y_q1(),"."),names(clean),value = TRUE)]))})
+    })
+    output$y_dq1_factor <- renderUI({
+      checkboxGroupInput(inputId = "y_dq1_level",
+                         label = "Y Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^DQ",y_dq1(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^DQ",y_dq1(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^DQ",y_dq1(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^DQ",y_dq1(),"."),names(clean),value = TRUE)]))})
+    })
+    
+    
+    ##  Y2
+    
+    y_q2 <- renderText({switch(input$y_q2,
+                               "Positivity (Factor)"= "1",
+                               "Frequency" = "2",
+                               "Who should hear?" = "3",
+                               "Who influenced?" = "4",
+                               "Story Involves" = "5",
+                               "Who Impacted Experience?" = "6")})
+    y_dq2 <- renderText({switch(input$y_dq2,
+                                "Age" = "1",
+                                "Gender" = "2",
+                                "Education" = "3",
+                                "Travel Abroad For?" = "4",
+                                "Rural/Urban" = "5",
+                                "Who Lives With You?" = "6",
+                                "Daily Expenses" = "7",
+                                "Region" = "8")})
+    output$y_q2_factor <- renderUI({
+      checkboxGroupInput(inputId = "y_q2_level",
+                         label = "Y Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^Q",y_q2(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^Q",y_q2(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^Q",y_q2(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^Q",y_q2(),"."),names(clean),value = TRUE)]))})
+    })
+    output$y_dq2_factor <- renderUI({
+      checkboxGroupInput(inputId = "y_dq2_level",
+                         label = "Y Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^DQ",y_dq2(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^DQ",y_dq2(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^DQ",y_dq2(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^DQ",y_dq2(),"."),names(clean),value = TRUE)]))})
+    })
+    
+    ##  Y3
+    
+    y_q3 <- renderText({switch(input$y_q3,
+                               "Positivity (Factor)"= "1",
+                               "Frequency" = "2",
+                               "Who should hear?" = "3",
+                               "Who influenced?" = "4",
+                               "Story Involves" = "5",
+                               "Who Impacted Experience?" = "6")})
+    y_dq3 <- renderText({switch(input$y_dq3,
+                                "Age" = "1",
+                                "Gender" = "2",
+                                "Education" = "3",
+                                "Travel Abroad For?" = "4",
+                                "Rural/Urban" = "5",
+                                "Who Lives With You?" = "6",
+                                "Daily Expenses" = "7",
+                                "Region" = "8")})
+    output$y_q3_factor <- renderUI({
+      checkboxGroupInput(inputId = "y_q3_level",
+                         label = "Y Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^Q",y_q3(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^Q",y_q3(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^Q",y_q3(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^Q",y_q3(),"."),names(clean),value = TRUE)]))})
+    })
+    output$y_dq3_factor <- renderUI({
+      checkboxGroupInput(inputId = "y_dq3_level",
+                         label = "Y Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^DQ",y_dq3(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^DQ",y_dq3(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^DQ",y_dq3(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^DQ",y_dq3(),"."),names(clean),value = TRUE)]))})
+    })
+    
+    ##  Y4
+    
+    y_q4 <- renderText({switch(input$y_q4,
+                               "Positivity (Factor)"= "1",
+                               "Frequency" = "2",
+                               "Who should hear?" = "3",
+                               "Who influenced?" = "4",
+                               "Story Involves" = "5",
+                               "Who Impacted Experience?" = "6")})
+    y_dq4 <- renderText({switch(input$y_dq4,
+                                "Age" = "1",
+                                "Gender" = "2",
+                                "Education" = "3",
+                                "Travel Abroad For?" = "4",
+                                "Rural/Urban" = "5",
+                                "Who Lives With You?" = "6",
+                                "Daily Expenses" = "7",
+                                "Region" = "8")})
+    output$y_q4_factor <- renderUI({
+      checkboxGroupInput(inputId = "y_q4_level",
+                         label = "Y Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^Q",y_q4(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^Q",y_q4(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^Q",y_q4(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^Q",y_q4(),"."),names(clean),value = TRUE)]))})
+    })
+    output$y_dq4_factor <- renderUI({
+      checkboxGroupInput(inputId = "y_dq4_level",
+                         label = "Y Factor Level",
+                         choices = if ((length(clean[,grep(paste0("^DQ",y_dq4(),"."),names(clean),value = TRUE)]) > 1) &&
+                                       (class(clean[,grep(paste0("^DQ",y_dq4(),"."),names(clean),value = TRUE)])[1] != "factor"))
+                         {c("Select",names(clean[,grep(paste0("^DQ",y_dq4(),"."),names(clean),value = TRUE)]))} else
+                         {c("Select",levels(clean[,grep(paste0("^DQ",y_dq4(),"."),names(clean),value = TRUE)]))})
+    })
+    
+    ##  Observer
+    
+    observe({
+      ##  X Vars
+        # x1
+      if (input$x1 != "Select") {updateCollapse(session,"x1_sig_type",open = c("Factor"))}
+      if (input$x1 == "Questions") {updateCollapse(session,"x1_sig_type",open = c("Level"))}
+      if (input$x1 == "Descriptors") {updateCollapse(session,"x1_sig_type",open = c("Level"))}
+        # x2
+      if (input$x2 != "Select") {updateCollapse(session,"x2_sig_type",open = c("Factor"))}
+      if (input$x2 == "Questions") {updateCollapse(session,"x2_sig_type",open = c("Level"))}
+      if (input$x2 == "Descriptors") {updateCollapse(session,"x2_sig_type",open = c("Level"))}
+        # x3
+      if (input$x3 != "Select") {updateCollapse(session,"x3_sig_type",open = c("Factor"))}
+      if (input$x3 == "Questions") {updateCollapse(session,"x3_sig_type",open = c("Level"))}
+      if (input$x3 == "Descriptors") {updateCollapse(session,"x3_sig_type",open = c("Level"))}
+        # x4
+      if (input$x4 != "Select") {updateCollapse(session,"x4_sig_type",open = c("Factor"))}
+      if (input$x4 == "Questions") {updateCollapse(session,"x4_sig_type",open = c("Level"))}
+      if (input$x4 == "Descriptors") {updateCollapse(session,"x4_sig_type",open = c("Level"))}
+      
+      ##  Y Vars
+        # y1
+      if (input$y1 != "Select") {updateCollapse(session,"y_sig_type",open = c("Factor"))}
+      if (input$y1 != "Questions") {updateCollapse(session,"y_sig_type",open = c("Level"))}
+      if (input$y1 != "Descriptors") {updateCollapse(session,"y_sig_type",open = c("Level"))}
+        # y2
+      if (input$y2 != "Select") {updateCollapse(session,"y2_sig_type",open = c("Factor"))}
+      if (input$y2 == "Questions") {updateCollapse(session,"y2_sig_type",open = c("Level"))}
+      if (input$y2 == "Descriptors") {updateCollapse(session,"y2_sig_type",open = c("Level"))}
+        # y3
+      if (input$y3 != "Select") {updateCollapse(session,"y3_sig_type",open = c("Factor"))}
+      if (input$y3 == "Questions") {updateCollapse(session,"y3_sig_type",open = c("Level"))}
+      if (input$y3 == "Descriptors") {updateCollapse(session,"y3_sig_type",open = c("Level"))}
+        # y4
+      if (input$y4 != "Select") {updateCollapse(session,"y4_sig_type",open = c("Factor"))}
+      if (input$y4 == "Questions") {updateCollapse(session,"y4_sig_type",open = c("Level"))}
+      if (input$y4 == "Descriptors") {updateCollapse(session,"y4_sig_type",open = c("Level"))}
+    })
+
+    ##  Dataframe Construction
+ 
+    rnames <- c(
+    x1out <- renderText({input$x1out}),
+    x2out <- renderText({input$x2out}),
+    x3out <- renderText({input$x3out}),
+    x4out <- renderText({input$x4out}),
+    
+    x1q_out <- renderText({input$x_q1_level}),
+    x2q_out <- renderText({input$x_q2_level}),
+    x3q_out <- renderText({input$x_q3_level}),
+    x4q_out <- renderText({input$x_q4_level}),
+    
+    x1dq_out <- renderText({input$x_dq1_level}),
+    x2dq_out <- renderText({input$x_dq2_level}),
+    x3dq_out <- renderText({input$x_dq3_level}),
+    x4dq_out <- renderText({input$x_dq4_level}))
+    rnames <- grep("[^Select]",rnames, value = TRUE)
+    
+    cnames <- c(
+    y1out <- renderText({input$y1out}),
+    y2out <- renderText({input$y2out}),
+    y3out <- renderText({input$y3out}),
+    y4out <- renderText({input$y4out}),
+    
+    y1q_out <- renderText({input$y_q1_level}),
+    y2q_out <- renderText({input$y_q2_level}),
+    y3q_out <- renderText({input$y_q3_level}),
+    y4q_out <- renderText({input$y_q4_level}),
+    
+    y1dq_out <- renderText({input$y_dq1_level}),
+    y2dq_out <- renderText({input$y_dq2_level}),
+    y3dq_out <- renderText({input$y_dq3_level}),
+    y4dq_out <- renderText({input$y_dq4_level})
+  )
+   cnames <- grep("[^Select]",cnames, value = TRUE)
+
+#   for (i in 1:length(rnames)) {
+#     if ((length(grep(paste0(rnames[i],"$"),names(clean))) > 0) &&
+#       ((length(grep(rnames[i],"^DQ[0-9]")) == 0) || (length(grep(rnames[i],"^Q[0-9]")) == 0))) 
+#     {for (j in 1:dim(clean)[2]) {
+#         if (!is.na(match(rnames[i],clean[,j])))
+#           {rnames <- paste0()}
+#       }}
+#   }
+   
+   search <- search()
+   if (is.na(match("clean", search))) {attach(clean)}
+   
+   #x <- clean[,c("DQ1.Age","Q2.How.common")]
+   #y <- clean[,c("DQ2.Gender","Q1.Feeling")]
+   
+   if ((length(cnames) > 0) && (length(rnames) > 0)) {
+   desc_rows <- clean[,rnames]
+   desc_cols <- clean[,cnames]
+   desc_stats <- table(desc_rows,desc_cols)}
+    
+    output$stats <- renderTable({
+      if ((input$x1 == "Select") && (input$y1 == "Select")) {
+        if (input$unit == "Percentage") {Statsp} else {Stats}} else {desc_stats}
+    })
+  })
+  
+  shinyApp(ui = ui, server = server)
+```

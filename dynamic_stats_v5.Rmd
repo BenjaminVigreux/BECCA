@@ -1,0 +1,417 @@
+---
+title: "BECCA"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: cerulean
+    logo: undp48.png
+    orientation: rows
+    runtime: shiny
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r Load Packages, include=FALSE}
+require(flexdashboard)
+require(tm)
+require(shiny)
+require(shinyBS)
+require(quanteda)
+require(RYandexTranslate)
+require(stm)
+require(wordcloud)
+require(htmlwidgets)
+require(stmBrowser)
+require(devtools)
+require(jsonlite)
+require(SnowballC)
+require(ggplot2)
+require(cluster)
+require(fpc)
+require(skmeans)
+require(knitr)
+require(xlsx) # for reading original xls files
+require(plotly) # for interactive map
+require(likert) # for Likert plots
+require(RColorBrewer) # for the Brewer color palette used in Triad plots
+require(grid) # required by Triad and likert plots
+require(gridExtra) # for arrangin the Triad plots
+require(mixtools) # for computing ellipsoids from clustering
+require(sp)
+require(magrittr)
+require(plotly)
+require(data.table)
+require(xtable)
+
+devtools::install_github("timelyportfolio/stmBrowser@htmlwidget") # This needs to be installed once
+```
+
+```{r Translation Switch, include=FALSE, echo=TRUE}
+## Switchboard
+
+switch_t <- 0 # Translation
+switch_c <- 1 # Corpus
+save(list = c("switch_c","switch_t"), file = "switches.RData")
+
+```
+
+```{r Load Datasets, include = FALSE, echo = FALSE}
+
+##  File Structure - Pleeeeaeease tell me if you mess with this ~Charlie.
+  #/Working Dir
+    #/dynamic_stats_v3.R
+    #/factor_to_integer.R
+    #/sort_signifiers.R
+    #/namegetter.R
+    #/[dataset]_factornames.RData - {No longer needed, namegetter.R returns a function not a file.}.
+    #/clean_data
+      #/[dataset]_clean.RData
+      #/texts
+        #/[dataset]_translated_texts.RData
+      #/corpus/
+        #/[dataset]_corpus.RData
+      #/subsets
+        #/[dataset]_subsets.RData
+
+knitr::opts_knit$set(root.dir = normalizePath('./'))
+# print(opts_knit$get("root.dir"))
+
+##  Load All Datasets
+
+wd <- getwd()
+dataset <- c("kyrgyzstan", "moldova", "unicef", "serbia", "tajikistan", "yemen")
+# print(dataset)
+
+for (d in 1:length(dataset)){
+  load(paste0(wd,"/clean_data/",dataset[d],"_clean.RData"))
+  dataset <- c("kyrgyzstan", "moldova", "unicef", "serbia", "tajikistan", "yemen")
+  assign(paste0(dataset[d]),clean)
+}
+
+##  Choose Dataset
+
+dataset <- "moldova" ## Pick one!
+load(paste0(wd,"/clean_data/",dataset,"_clean.RData"))
+load(paste0(wd,"/clean_data/texts/",dataset,"_translated_texts.RData"))
+load(paste0(wd,"/clean_data/subsets/",dataset,"_subsets.RData"))
+save("dataset", file = "dataset.txt")
+
+##  Attach to search dir
+
+search <- search()
+if (!is.na(match("clean", search))) {detach(clean)}
+if (!is.na(match("data", search))) {detach(data)}
+search <- search()
+if (is.na(match("clean", search))) {attach(clean)}
+# knitr::opts_knit$set(root.dir = normalizePath('../'))
+# print(opts_knit$get("root.dir"))
+
+```
+
+```{r Load All Corpuses and Texts}
+## Load all Corpuses
+load(paste0(wd,"/clean_data/corpus/moldova_corpus.RData"))
+moldova_corpus <- corpus
+load(paste0(wd,"/clean_data/corpus/kyrgyzstan_corpus.RData"))
+kyrgyzstan_corpus <- corpus
+load(paste0(wd,"/clean_data/corpus/serbia_corpus.RData"))
+serbia_corpus <- corpus
+load(paste0(wd,"/clean_data/corpus/tajikistan_corpus.RData"))
+tajikistan_corpus <- corpus
+load(paste0(wd,"/clean_data/corpus/yemen_corpus.RData"))
+yemen_corpus <- corpus
+load(paste0(wd,"/clean_data/corpus/unicef_corpus.RData"))
+unicef_corpus <- corpus
+
+# names(summary(yemen_corpus))
+# names(summary(tajikistan_corpus))
+load(paste0(wd,"/clean_data/texts/moldova_translated_texts.RData"))
+moldova_texts_eng <- texts_eng
+moldova_texts_org <- texts_org
+moldova_titles_eng <- titles_eng
+moldova_titles_org <- titles_org
+
+load(paste0(wd,"/clean_data/texts/kyrgyzstan_translated_texts.RData"))
+kyrgyzstan_texts_eng <- texts_eng
+kyrgyzstan_texts_org <- texts_org
+kyrgyzstan_titles_eng <- titles_eng
+kyrgyzstan_titles_org <- titles_org
+
+load(paste0(wd,"/clean_data/texts/serbia_translated_texts.RData"))
+serbia_texts_eng <- texts_eng
+serbia_texts_org <- texts_org
+serbia_titles_eng <- titles_eng
+serbia_titles_org <- titles_org
+
+load(paste0(wd,"/clean_data/texts/tajikistan_translated_texts.RData"))
+tajikistan_texts_eng <- texts_eng
+tajikistan_texts_org <- texts_org
+tajikistan_titles_eng <- titles_eng
+tajikistan_titles_org <- titles_org
+
+load(paste0(wd,"/clean_data/texts/yemen_translated_texts.RData"))
+yemen_texts_eng <- texts_eng
+yemen_texts_org <- texts_org
+yemen_titles_eng <- titles_eng
+yemen_titles_org <- titles_org
+
+load(paste0(wd,"/clean_data/texts/unicef_translated_texts.RData"))
+unicef_texts_eng <- texts_eng
+unicef_texts_org <- texts_org
+unicef_titles_eng <- titles_eng
+unicef_titles_org <- titles_org
+
+
+# sum(is.na(unicef_texts_eng))
+
+
+```
+
+```{r Dependencies, echo=FALSE}
+wd <- getwd()
+ds.env <- reactiveValues()
+
+source("ds_preprocess.R")
+source("factor_to_integer.R")
+source("namegetter.R")
+source("sort_signifiers.R")
+source("unit2perc.R")
+```
+
+Descriptive Statistics {data-navmenu="STM"}
+=====================================
+
+Descriptive Statistics {.sidebar}
+-------------------------------------
+
+```{r Desc Stats: Dataset Builder, echo=FALSE}
+
+# Choose Dataset
+selectInput(inputId = "dataset",
+                  label = "Select Dataset",
+                  choices = c("Moldova","Kyrgyzstan UNDP","Kyrgyzstan Unicef","Serbia","Yemen","Tajikistan"),
+                  selected = "Moldova")
+
+# Process dataset
+observeEvent(input$dataset,{
+  
+  # Get dataset
+  dataset <- switch(input$dataset,
+                    "Moldova" = moldova,
+                    "Kyrgyzstan UNDP" = kyrgyzstan,
+                    "Kyrgyzstan Unicef" = unicef,
+                    "Serbia" = serbia,
+                    "Yemen" = yemen,
+                    "Tajikistan" = tajikistan)
+  
+  ds.env$dataset <- ds.process(dataset)
+  
+  ds.env$triads <- triads
+  ds.env$dyads <- dyads
+  ds.env$stones <- stones
+  
+  ds.env$qnames <- qnames
+  ds.env$dqnames <- dqnames
+  })
+```
+
+```{r Row Selection, echo=FALSE}
+
+# Choose Rows: Signifier Type
+selectInput(inputId = "x1",
+                  label = "Choose Rows",
+                  choices = c("Select","Triads","Dyads","Stones","Questions","Descriptors"))
+
+renderUI({
+# Create covariate options
+ds.env$x.choices <- switch(input$x1,
+                           "Choose Signifier Type" = "Select",
+                           "Triads" = names(ds.env$triads),
+                           "Dyads" = names(ds.env$dyads),
+                           "Stones" = names(ds.env$stones),
+                           "Questions" = ds.env$qnames,
+                           "Descriptors" = ds.env$dqnames)
+
+# Choose Rows: Covariate dropdown
+conditionalPanel(condition = "input.x1 != 'Select'",
+                 selectInput(inputId = "x2",
+                             label = "Choose Covariates",
+                             choices = ds.env$x.choices))
+})
+
+renderUI({
+# Choose Rows: Get factor levels
+  ds.env$x.levels <- if (req(input$x2) != "Select")
+    grep(input$x2, names(ds.env$dataset), value = TRUE)
+
+# Choose Rows: factor level checkboxes
+conditionalPanel(condition = "input.x1 == 'Questions' || input.x1 == 'Descriptors'",
+                 checkboxInput(inputId = "x_all","All/None"),
+                 checkboxGroupInput(inputId = "xlevel",
+                                    label = "Factor Level",
+                                    choices = ds.env$x.levels))
+})
+
+# Choose Rows: select all factor levels.
+observe({
+  if (req(input$x_all))
+    updateCheckboxGroupInput(session,
+                             inputId = "xlevel",
+                             label = "Factor Level",
+                             choices = ds.env$x.levels,
+                             selected = ds.env$x.levels)
+})
+
+# Choose Rows: Continuous variable slider
+conditionalPanel(condition = "input.x1 == 'Triads' || input.x1 == 'Dyads' || input.x1 == 'Stones'",
+                 sliderInput(inputId = "x_sld",
+                             label = "Choose Range",
+                             min = 0, max = 10, value = c(0,6), step = 0.5,
+                             dragRange = TRUE))
+
+actionButton("rows_go", "Select Rows")
+```
+
+```{r Column Selection, echo=FALSE}
+
+# Choose Columns: Signifier Type
+selectInput(inputId = "y1",
+            label = "Choose Columns",
+            choices = c("Select","Triads","Dyads","Stones","Questions","Descriptors"))
+
+renderUI({
+# Create covariate options
+  ds.env$y.choices <- switch(input$y1,
+                             "Select" = "Choose Signifier Type",
+                             "Triads" = names(ds.env$triads),
+                             "Dyads" = names(ds.env$dyads),
+                             "Stones" = names(ds.env$stones),
+                             "Questions" = ds.env$qnames,
+                             "Descriptors" = ds.env$dqnames)
+
+  # Choose Columns: Covariate dropdown
+  conditionalPanel(condition = "input.y1 != 'Select'",
+                   selectInput(inputId = "y2",
+                               label = "Choose Covariates",
+                               choices = ds.env$y.choices))
+})
+
+renderUI({
+# Choose Columns: Get factor levels
+ds.env$y.levels <- if (req(input$y2) != "Select")
+  grep(input$y2, names(ds.env$dataset), value = TRUE)
+
+# Choose Columns: factor level checkboxes
+conditionalPanel(condition = "input.y1 == 'Questions' || input.y1 == 'Descriptors'",
+                 checkboxInput(inputId = "y_all","All/None"),
+                 checkboxGroupInput(inputId = "ylevel",
+                                    label = "Factor Level",
+                                    choices = ds.env$y.levels))
+})
+
+# Choose Columns: select all factor levels
+observe({
+  if (req(input$y_all))
+    updateCheckboxGroupInput(session,
+                             inputId = "ylevel",
+                             label = "Factor Level",
+                             choices = ds.env$y.levels,
+                             selected = ds.env$y.levels)
+})
+
+# Choose Columns: Continuous variable slider
+conditionalPanel(condition = "input.y1 == 'Triads' || input.y1 == 'Dyads' || input.y1 == 'Stones'",
+  sliderInput(inputId = "y_sld",
+            label = "Choose Range",
+            min = 0, max = 10, value = c(0,6), step = 0.5,
+            dragRange = TRUE))
+
+actionButton("cols_go", "Select Columns")
+
+hr()
+
+radioButtons(inputId = "unit",
+             label = "Unit/Percentage",
+             choices = c("Unit", "Percentage"))
+
+hr()
+
+actionButton("ds_go", "Build Statistics")
+```
+
+```{r Variable Table, echo=FALSE}
+
+ds.env$rows <- NULL
+ds.env$cols <- NULL
+
+observeEvent(input$rows_go,{
+  source("var_table.r")
+  rows <- ds.env$rows
+  rows <- var.table(rows, input$x2, input$x1, level = input$xlevel, range = input$x_sld)
+  ds.env$rows <- rows
+  output$row_selection <- renderTable(ds.env$rows, include.rownames = FALSE, align = rep("l",dim(ds.env$rows)[2] + 1))
+})
+
+observeEvent(input$cols_go,{
+  source("var_table.r")
+  cols <- ds.env$cols
+  cols <- var.table(cols, input$y2, input$y1, level = input$ylevel, range = input$y_sld)
+  ds.env$cols <- cols
+  output$col_selection <- renderTable(ds.env$cols, include.rownames = FALSE, align = rep("l",dim(ds.env$cols)[2] + 1))
+})
+
+observeEvent(input$ds_go,{
+  source("ds_builder.R")
+  ds.env$desc.stats <- ds.builder(ds.env$rows, ds.env$cols, ds.env$dataset)
+  ds.env$desc.percs <- ds.builder(ds.env$rows, ds.env$cols, ds.env$dataset, perc = TRUE)
+  if (input$unit == "Unit") {
+    output$stats <- renderTable(ds.env$desc.stats)
+  } else {
+    output$stats <- renderTable(ds.env$desc.percs)
+  }
+})
+
+observeEvent(input$unit,{
+  if (input$unit == "Unit") {
+    output$stats <- renderTable(ds.env$desc.stats)
+  } else {
+    output$stats <- renderTable(ds.env$desc.percs)
+  }
+})
+```
+
+Descriptive Statistics {.tabset}
+-------------------------------------
+
+### Variable Selection and Summaries
+
+```{r Descriptive Stats Tabs}
+
+# Summary of currently selected variable
+fluidRow(column("Summary", width = 12))
+
+fluidRow(
+  column(strong("Selected Rows"), tableOutput("row_selection"), width = 6),
+  column(strong("Selected Columns"), tableOutput("col_selection"), width = 6)
+)
+```
+
+### Descriptive Statistics
+
+```{r DS Table}
+tableOutput("stats")
+```
+
+### Debugging
+
+```{r}
+
+##  Temporary Panel For Debugging
+
+inputPanel(textInput(inputId = "debugger", "Print Console"), actionButton("run", "Execute"))
+
+observeEvent(input$run,{
+  output$debug <- renderPrint(eval(parse(text=isolate(input$debugger)), envir = parent.frame(n=1)))
+})
+htmlOutput("debug")
+```
+

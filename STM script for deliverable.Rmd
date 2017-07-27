@@ -1,0 +1,96 @@
+---
+title: "Common Deliverable"
+output: 
+ flexdashboard::flex_dashboard:
+    orientation: rows
+    runtime: shiny
+    vertical_layout: fill
+runtime: shiny
+---
+
+
+
+```{r, include=FALSE}
+library(stm)
+library(wordcloud)
+devtools::install_github("timelyportfolio/stmBrowser@htmlwidget")
+library(htmlwidgets)
+library(stmBrowser)
+library(devtools)
+library(jsonlite)
+library(base)
+temp<-textProcessor(documents=clean$texts,metadata=clean)
+meta<-temp$meta
+vocab<-temp$vocab
+docs<-temp$documents
+out <- prepDocuments(docs, vocab, meta)
+docs<-out$documents
+vocab<-out$vocab
+meta <-out$meta
+meta$EntryDate <- as.Date(meta$EntryDate)
+meta$DQ2.Gender <- as.factor(meta$DQ2.Gender)
+meta$DQ3.Education <- as.factor(meta$DQ3.Education)
+meta$DQ1.Age <- as.factor(meta$DQ1.Age)
+```
+
+
+```{r, eval=FALSE}
+n_topics = seq(from = 5, to = 20, by = 1)
+storage <- searchK(out$documents, out$vocab, K = n_topics,
+                   prevalence  =~ EntryDate + DQ1.Age.1 + DQ3.Education.1 + DQ2.Gender., data = meta)
+
+x <- as.vector(storage$results$exclus)
+y <- as.vector(storage$results$semcoh)
+a=(x-mean(x))/sd(x)
+b=(y-mean(y))/sd(y)
+
+x<- which.max(a)
+y <- which.min(b)
+K <- (y+x)/2
+```
+
+```{r, include=FALSE}
+#Run STM. We can include more metadata if we want
+ferdigB <- stm(docs, vocab, 8, prevalence  =~ EntryDate + DQ1.Age + DQ3.Education + DQ2.Gender, data = meta)
+```
+
+Labels STM {data-navmenu="Moldova"}
+===================================== 
+```{r}
+labelTopics(ferdigB, topics=NULL, n = 7, frexweight = 0.5)
+```
+
+Clouds STM {data-navmenu="Moldova"}
+==================================================
+```{r, echo=FALSE}
+cloud(ferdigB, topic=1, type=c("model", "documents"),
+      documents, thresh=.9, max.words=100)
+text(x=0.5, y=1, "Topic 1")
+cloud(ferdigB, topic=2, type=c("model", "documents"),
+      documents, thresh=.9, max.words=100)
+text(x=0.5, y=1, "Topic 2")
+cloud(ferdigB, topic=3, type=c("model", "documents"),
+      documents, thresh=.9, max.words=100)
+text(x=0.5, y=1, "Topic 3")
+cloud(ferdigB, topic=4, type=c("model", "documents"),
+      documents, thresh=.9, max.words=100)
+text(x=0.5, y=1, "Topic 4")
+cloud(ferdigB, topic=5, type=c("model", "documents"),
+      documents, thresh=.9, max.words=100)
+text(x=0.5, y=1, "Topic 5")
+cloud(ferdigB, topic=6, type=c("model", "documents"),
+      documents, thresh=.9, max.words=100)
+text(x=0.5, y=1, "Topic 6")
+cloud(ferdigB, topic=7, type=c("model", "documents"),
+      documents, thresh=.9, max.words=100)
+text(x=0.5, y=1, "Topic 7")
+cloud(ferdigB, topic=8, type=c("model", "documents"),
+      documents, thresh=.9, max.words=100)
+text(x=0.5, y=1, "Topic 8")
+```
+
+Explore STM {data-navmenu="Moldova"}
+===================================== 
+```{r, echo=FALSE}
+stmBrowser_widget(ferdigB, data=meta, c("EntryDate","DQ1.Age","DQ3.Education", "DQ2.Gender"),text="texts", labeltype='frex')
+```

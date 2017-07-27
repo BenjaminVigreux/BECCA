@@ -1,0 +1,1429 @@
+---
+title: "BECCA"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: cerulean
+    logo: undp48.png
+    orientation: rows
+    runtime: shiny
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r Load Packages, include=FALSE}
+require(flexdashboard)
+require(tm)
+require(shiny)
+require(shinyBS)
+require(quanteda)
+require(RYandexTranslate)
+require(stm)
+require(wordcloud)
+require(htmlwidgets)
+require(stmBrowser)
+require(devtools)
+require(jsonlite)
+require(SnowballC)
+require(ggplot2)
+require(cluster)
+require(fpc)
+require(skmeans)
+require(knitr)
+require(xlsx) # for reading original xls files
+require(plotly) # for interactive map
+require(likert) # for Likert plots
+require(RColorBrewer) # for the Brewer color palette used in Triad plots
+require(grid) # required by Triad and likert plots
+require(gridExtra) # for arrangin the Triad plots
+require(mixtools) # for computing ellipsoids from clustering
+require(sp)
+require(magrittr)
+require(plotly)
+require(data.table)
+require(xtable)
+
+
+devtools::install_github("timelyportfolio/stmBrowser@htmlwidget") # This needs to be installed once
+
+
+```
+
+```{r Translation Switch, include=FALSE, echo=TRUE}
+## Switchboard
+
+switch_t <- 0 # Translation
+switch_c <- 1 # Corpus
+save(list = c("switch_c","switch_t"), file = "switches.RData")
+
+```
+
+```{r Load Datasets, include = FALSE, echo = FALSE}
+
+##  File Structure - Pleeeeaeease tell me if you mess with this ~Charlie.
+  #/Working Dir
+    #/dynamic_stats_v3.R
+    #/factor_to_integer.R
+    #/sort_signifiers.R
+    #/namegetter.R
+    #/[dataset]_factornames.RData - {No longer needed, namegetter.R returns a function not a file.}.
+    #/clean_data
+      #/[dataset]_clean.RData
+      #/texts
+        #/[dataset]_translated_texts.RData
+      #/corpus/
+        #/[dataset]_corpus.RData
+      #/subsets
+        #/[dataset]_subsets.RData
+
+knitr::opts_knit$set(root.dir = normalizePath('./'))
+# print(opts_knit$get("root.dir"))
+
+##  Load All Datasets
+
+wd <- getwd()
+dataset <- c("kyrgyzstan", "moldova", "unicef", "serbia", "tajikistan", "yemen")
+# print(dataset)
+
+#metti source
+data <- array(list(),6)
+
+for (d in 1:length(dataset)){
+  load(paste0(wd,"/clean_data/",dataset[d],"_clean.RData"))
+  assign(paste0(dataset[d]),clean)
+  data[[d]] <- clean
+}
+
+##  Choose Dataset
+
+dataset <- "moldova" ## Pick one!
+load(paste0(wd,"/clean_data/",dataset,"_clean.RData"))
+load(paste0(wd,"/clean_data/texts/",dataset,"_translated_texts.RData"))
+load(paste0(wd,"/clean_data/subsets/",dataset,"_subsets.RData"))
+save("dataset", file = "dataset.txt")
+
+##  Attach to search dir
+
+search <- search()
+if (!is.na(match("clean", search))) {detach(clean)}
+if (!is.na(match("data", search))) {detach(data)}
+search <- search()
+if (is.na(match("clean", search))) {attach(clean)}
+# knitr::opts_knit$set(root.dir = normalizePath('../'))
+# print(opts_knit$get("root.dir"))
+
+```
+
+```{r Load All Corpuses and Texts}
+## Load all Corpuses
+load(paste0(wd,"/clean_data/corpus/moldova_corpus.RData"))
+moldova_corpus <- corpus
+load(paste0(wd,"/clean_data/corpus/kyrgyzstan_corpus.RData"))
+kyrgyzstan_corpus <- corpus
+load(paste0(wd,"/clean_data/corpus/serbia_corpus.RData"))
+serbia_corpus <- corpus
+load(paste0(wd,"/clean_data/corpus/tajikistan_corpus.RData"))
+tajikistan_corpus <- corpus
+load(paste0(wd,"/clean_data/corpus/yemen_corpus.RData"))
+yemen_corpus <- corpus
+load(paste0(wd,"/clean_data/corpus/unicef_corpus.RData"))
+unicef_corpus <- corpus
+
+# names(summary(yemen_corpus))
+# names(summary(tajikistan_corpus))
+load(paste0(wd,"/clean_data/texts/moldova_translated_texts.RData"))
+moldova_texts_eng <- texts_eng
+moldova_texts_org <- texts_org
+moldova_titles_eng <- titles_eng
+moldova_titles_org <- titles_org
+
+load(paste0(wd,"/clean_data/texts/kyrgyzstan_translated_texts.RData"))
+kyrgyzstan_texts_eng <- texts_eng
+kyrgyzstan_texts_org <- texts_org
+kyrgyzstan_titles_eng <- titles_eng
+kyrgyzstan_titles_org <- titles_org
+
+load(paste0(wd,"/clean_data/texts/serbia_translated_texts.RData"))
+serbia_texts_eng <- texts_eng
+serbia_texts_org <- texts_org
+serbia_titles_eng <- titles_eng
+serbia_titles_org <- titles_org
+
+load(paste0(wd,"/clean_data/texts/tajikistan_translated_texts.RData"))
+tajikistan_texts_eng <- texts_eng
+tajikistan_texts_org <- texts_org
+tajikistan_titles_eng <- titles_eng
+tajikistan_titles_org <- titles_org
+
+load(paste0(wd,"/clean_data/texts/yemen_translated_texts.RData"))
+yemen_texts_eng <- texts_eng
+yemen_texts_org <- texts_org
+yemen_titles_eng <- titles_eng
+yemen_titles_org <- titles_org
+
+load(paste0(wd,"/clean_data/texts/unicef_translated_texts.RData"))
+unicef_texts_eng <- texts_eng
+unicef_texts_org <- texts_org
+unicef_titles_eng <- titles_eng
+unicef_titles_org <- titles_org
+
+
+# sum(is.na(unicef_texts_eng))
+
+
+```
+
+```{r SetupCA, echo = FALSE, include = FALSE}
+source("undp_setup.R", local=environment()) # Initial parameters
+#source("undp_read.R", local=environment()) # Read data bases and translate foreign words of new records
+source("undp_preprocess.R", local=environment()) # Process the data bases
+source("undp_myworldmap.R", local=environment()) # Produces the world map of feeling
+source("undp_mylikert.R", local=environment()) # Produces Likert plots
+source("undp_mytimeseries.R", local=environment()) # Produces time series plots
+source("undp_mytimeseries2.R", local=environment()) # Produces time series plots of Positive/Negative feeling
+source("undp_mytriad.R", local=environment()) # Produces Triad plots
+```
+
+
+World Map {data-orientation=columns}
+=====================================  
+
+Map {.sidebar}
+-------------------------------------
+```{r}
+
+selectInput("mapVars", label = "Select Index",
+            choices = c("Population", "GDP", "GDP Per Capita", "GDP Growth", 
+                        "Average Feeling (Positive/Neutral/Negative)"),
+            selected = "Population")
+
+```
+
+Row
+-------------------------------------
+
+```{r Prepare for maps, include = FALSE, echo = TRUE}
+# READ IN DATA
+
+formaps <- read.xlsx("ForMaps.xlsx", 1)
+
+# WHAT COLUMNS DO WE HAVE?
+
+formaps$GDP.Growth<-as.numeric(levels(formaps$GDP.Growth))[formaps$GDP.Growth]
+formaps$GDP.per.capita<-as.numeric(levels(formaps$GDP.per.capita))[formaps$GDP.per.capita]
+formaps$GDP<-as.numeric(levels(formaps$GDP))[formaps$GDP]
+formaps$Population<-as.numeric(levels(formaps$Population))[formaps$Population]
+
+
+## Log variables to make graphs more legible
+
+formaps$GDP<-log(formaps$GDP)
+formaps$GDP.per.capita<-log(formaps$GDP.per.capita)
+formaps$Population<-log(formaps$Population)
+
+```   
+
+```{r Population, include = FALSE, echo = TRUE}
+## Population
+
+# light grey boundaries
+l <- list(color = toRGB("grey"), width = 0.5)
+
+# specify map projection/options
+g <- list(
+  showframe = FALSE,
+  showcoastlines = TRUE,
+  projection = list(type = 'Mercator'),
+  showland = TRUE,
+  landcolor = toRGB("grey83"),
+  #subunitcolor = toRGB("white"),
+  countrycolor = toRGB("white"),
+  showlakes = TRUE,
+  lakecolor = toRGB("white"),
+  #showsubunits = TRUE,
+  showcountries = TRUE,
+  resolution = 50,
+  countrywidth = 0.5,
+  subunitwidth = 0.5,
+  showlakes=TRUE,
+  lakecolor = toRGB("white")
+)
+
+population <- (plot_ly(formaps, z = Population,
+                      locations = Country.Code,
+                      type = 'choropleth',
+                      color = Population, colors = 'Blues', marker = list(line = l),
+                      colorbar = list(tickprefix = '', title = ' log Population'),
+                      inherit = FALSE, # don't pass arguments into the next trace
+                      filename="r-docs/choropleth-with-country-labels") %>%
+                layout(title = 'Country Population',
+                       geo = g) %>% 
+                dplyr::arrange(dplyr::desc(GDP)))[seq(1, 10), ] %>%
+  add_trace(type="scattergeo", 
+            mode="text")
+
+```  
+   
+```{r GDP, include = FALSE, echo = TRUE}
+
+## GDP
+
+# light grey boundaries
+l <- list(color = toRGB("grey"), width = 0.5)
+
+# specify map projection/options
+g <- list(
+  showframe = FALSE,
+  showcoastlines = TRUE,
+  projection = list(type = 'Mercator'),
+  showland = TRUE,
+  landcolor = toRGB("lightgrey"),
+  #subunitcolor = toRGB("white"),
+  countrycolor = toRGB("white"),
+  showlakes = TRUE,
+  lakecolor = toRGB("white"),
+  #showsubunits = TRUE,
+  showcountries = TRUE,
+  resolution = 50,
+  countrywidth = 0.5,
+  subunitwidth = 0.5,
+  showlakes=TRUE,
+  lakecolor = toRGB("white")
+)
+
+GDP <- (plot_ly(formaps, z = GDP,
+                   locations = Country.Code,
+                   type = 'choropleth',
+                   color = GDP, colors = 'Blues', marker = list(line = l),
+                   colorbar = list(tickprefix = '', title = 'log GDP'),
+                   inherit = FALSE, # don't pass arguments into the next trace
+                   filename="r-docs/choropleth-with-country-labels") %>%
+             layout(title = 'Country GDP',
+                    geo = g) %>% 
+             dplyr::arrange(dplyr::desc(GDP)))[seq(1, 10), ] %>%
+  add_trace(type="scattergeo", 
+            mode="text")
+```      
+   
+```{r GDP per capita, include = FALSE, echo = TRUE}
+# light grey boundaries
+l <- list(color = toRGB("grey"), width = 0.5)
+
+# specify map projection/options
+g <- list(
+  showframe = FALSE,
+  showcoastlines = TRUE,
+  projection = list(type = 'Mercator'),
+  showland = TRUE,
+  landcolor = toRGB("lightgrey"),
+  #subunitcolor = toRGB("white"),
+  countrycolor = toRGB("white"),
+  showlakes = TRUE,
+  lakecolor = toRGB("white"),
+  #showsubunits = TRUE,
+  showcountries = TRUE,
+  resolution = 50,
+  countrywidth = 0.5,
+  subunitwidth = 0.5,
+  showlakes=TRUE,
+  lakecolor = toRGB("white")
+)
+
+percapita <- (plot_ly(formaps, z = GDP.per.capita,
+                locations = Country.Code,
+                type = 'choropleth',
+                color = GDP.per.capita, colors = 'Blues', marker = list(line = l),
+                colorbar = list(tickprefix = '', title = 'log GDP per capita'),
+                inherit = FALSE, # don't pass arguments into the next trace
+                filename="r-docs/choropleth-with-country-labels") %>%
+          layout(title = 'GPD per capita',
+                 geo = g) %>% 
+          dplyr::arrange(dplyr::desc(GDP)))[seq(1, 10), ] %>%
+  add_trace(type="scattergeo", 
+            mode="text")
+
+```      
+   
+```{r GDP growth, include = FALSE, echo = TRUE}
+
+## Growth
+
+# light grey boundaries
+l <- list(color = toRGB("grey"), width = 0.5)
+
+# specify map projection/options
+g <- list(
+  showframe = FALSE,
+  showcoastlines = TRUE,
+  projection = list(type = 'Mercator'),
+  showland = TRUE,
+  landcolor = toRGB("lightgrey"),
+  #subunitcolor = toRGB("white"),
+  countrycolor = toRGB("white"),
+  showlakes = TRUE,
+  lakecolor = toRGB("white"),
+  #showsubunits = TRUE,
+  showcountries = TRUE,
+  resolution = 50,
+  countrywidth = 0.5,
+  subunitwidth = 0.5,
+  showlakes=TRUE,
+  lakecolor = toRGB("white")
+)
+
+growth <- (plot_ly(formaps, z = GDP.Growth,
+              locations = Country.Code,
+              type = 'choropleth',
+              color = GDP.Growth, colors = 'Blues', marker = list(line = l),
+              colorbar = list(tickprefix = '%', title = 'GDP Growth'),
+              inherit = FALSE, # don't pass arguments into the next trace
+              filename="r-docs/choropleth-with-country-labels") %>%
+        layout(title = 'Annual GDP Growth (Percent)',
+               geo = g) %>% 
+        dplyr::arrange(dplyr::desc(GDP.Growth)))[seq(1, 10), ] %>%
+  add_trace(type="scattergeo", 
+            mode="text")
+```      
+
+### World Map
+
+```{r Reactive Map}
+
+renderPlotly({ 
+  
+  if (input$mapVars == "Population") {
+    population  
+  } 
+  else if (input$mapVars == "GDP") {
+    GDP
+  }
+  else if (input$mapVars == "GDP Per Capita") {
+    percapita
+  }
+  else if (input$mapVars == "GDP Growth") {
+    growth
+  } else if (input$mapVars == "Average Feeling (Positive/Neutral/Negative)") {
+    myworldmap(data,Country) 
+  }
+})
+```   
+
+
+Descriptive Statistics
+=====================================
+
+```{r Descriptive Stats, eval=FALSE}
+
+shinyAppFile("dynamic_stats_v4.R")
+
+```
+
+Feeling Over Time 
+=====================================  
+  
+Feeling {.sidebar}
+-------------------------------------
+  
+```{r Feeling Inputs}
+selectInput("Countrys", label = "Select Country",
+            choices = c("Moldova", "Kyrgyzstan", #"Serbia", 
+                        "Tajikistan", "Yemen", "Kyrgyzstan Unicef"), selected = "Moldova")
+reactncountrys <- reactive({
+  switch(input$Countrys, "Kyrgyzstan" = {ncountry<-1},"Moldova" = {ncountry<-2},
+         "Kyrgyzstan Unicef" = {ncountry<-3}, #"Serbia" = {ncountry<-4},
+          "Tajikistan" = {ncountry<-5}, "Yemen" = {ncountry<-6})
+})
+
+sliderInput("Cut_days", label = "Window length (days)",
+            min = 3, max = 30, value = 7, step = 1)
+```
+
+Choose Stories (upper left graph):
+  
+```{r Feeling Checkbox Inputs}
+checkboxInput("checkPos", "Positive Stories", T) 
+
+checkboxInput("checkNeu", "Neutral Stories", T)
+
+checkboxInput("checkNeg", "Negative Stories", T)
+```
+
+Row
+-------------------------------------
+  
+  
+### Percentage of Positive, Neutral and Negative Stories Over Time
+  
+
+```{r Feeling Pos Neu Neg Over Time}
+renderPlot({
+  
+  ncountry <- reactncountrys()
+  Cut_days <- input$Cut_days
+  checkNeg <- input$checkNeg  
+  checkPos <- input$checkPos  
+  checkNeu <- input$checkNeu  
+  
+  mytimeseries2(ncountry,Cut_days,checkNeg,checkPos,checkNeu)
+  
+}) # End of renderPlot()
+
+``` 
+
+### Mean Trend
+
+```{r Feeling Mean Trend}
+
+renderPlot({
+  
+  ncountry <- reactncountrys()
+  Cut_days <- input$Cut_days
+  
+  mytimeseries(data,Country,ncountry,Cut_days)
+  
+}) # End of renderPlot()
+
+``` 
+
+Row
+-------------------------------------
+  
+### Likert Plot
+  
+```{r Feeling Likert Plot}
+
+renderPlot({
+  
+  ncountry <- reactncountrys()
+  Cut_days <- input$Cut_days
+  
+  mylikert(data,Country,ncountry,Cut_days)
+
+}) # End of renderPlot
+
+```
+
+Frequent Terms
+=====================================
+
+Frequent Terms {.sidebar}
+-------------------------------------
+
+```{r Frequent Terms Inputs}
+selectInput("FrequentTermsCountry", label = "Select Country",
+            choices = c("Moldova" = "moldova", "Kyrgyzstan" = "kyrgyzstan", "Serbia" = "serbia", "Tajikistan" = "tajikistan", "Yemen" = "yemen"),
+            selected = "moldova")
+```
+
+> **FREQUENT TERMS** 
+> **Wordclouds**: visualization tool showing the most frequent words appearing in the data. The bigger the word, the more frequent it is.
+
+> **Bar chart** : Another visualization tool for frequent terms. The most frequent words are displayed, and the frequency with which they appear on the texts is given by the y-axis value. 
+
+
+Column
+-------------------------------------
+
+### Word Cloud {data-height=650}
+
+```{r Moldova Term Frequency Setup , echo=FALSE}
+# moldova <- read.csv("Moldova_1.csv")
+# moldovatext <- Corpus(VectorSource(moldova$"Your.experience"))
+moldovatext <- Corpus(VectorSource(moldova_texts_eng))
+moldovatext <- tm_map(moldovatext, removePunctuation)
+
+for(j in seq(moldovatext)) {     #######(start Comment) Is this part still necessary after file has been cleaned by Charlie's code?       
+  moldovatext[[j]] <- gsub("/", " ", moldovatext[[j]])   
+  moldovatext[[j]] <- gsub("@", " ", moldovatext[[j]])   
+  moldovatext[[j]] <- gsub("\\|", " ", moldovatext[[j]]) 
+}  
+
+moldovatext <- tm_map(moldovatext, removeNumbers)  
+moldovatext <- tm_map(moldovatext, tolower)
+moldovatext <- tm_map(moldovatext, removeWords, stopwords("english")) 
+
+# library(SnowballC)   
+moldovatext <- tm_map(moldovatext, stemDocument) 
+moldovatext <- tm_map(moldovatext, stripWhitespace) 
+
+moldovatext <- tm_map(moldovatext, PlainTextDocument)  ################# (end Comment) ##########################################
+
+## Stage the data
+
+moldovadtm <- DocumentTermMatrix(moldovatext) 
+
+moldovatdm <- TermDocumentMatrix(moldovatext)   
+
+moldovafreq <- colSums(as.matrix(moldovadtm))   
+
+moldovafreq<-sort(moldovafreq, decreasing = TRUE)
+moldovafrequency<-head(moldovafreq, 20)
+
+moldovawf <- data.frame(moldovaword=names(moldovafrequency), moldovafrequency=moldovafrequency)
+
+moldovawf$moldovaword <- factor(moldovawf$moldovaword, levels =  moldovawf$moldovaword[order(moldovawf$moldovafreq, decreasing = TRUE)])
+
+```
+
+```{r Tagikistan Term Frequency Setup , echo=FALSE}
+# moldova <- read.csv("Moldova_1.csv")
+tajikistantext <- Corpus(VectorSource(tajikistan_texts_eng))
+tajikistantext <- tm_map(tajikistantext, removePunctuation)
+
+for(j in seq(tajikistantext)) {     #######(start Comment) Is this part still necessary after file has been cleaned by Charlie's code?       
+  tajikistantext[[j]] <- gsub("/", " ", tajikistantext[[j]])   
+  tajikistantext[[j]] <- gsub("@", " ", tajikistantext[[j]])   
+  tajikistantext[[j]] <- gsub("\\|", " ", tajikistantext[[j]]) 
+}  
+
+tajikistantext <- tm_map(tajikistantext, removeNumbers)  
+tajikistantext <- tm_map(tajikistantext, tolower)
+tajikistantext <- tm_map(tajikistantext, removeWords, stopwords("english")) 
+
+tajikistantext <- tm_map(tajikistantext, stemDocument) 
+tajikistantext <- tm_map(tajikistantext, stripWhitespace) 
+
+tajikistantext <- tm_map(tajikistantext, PlainTextDocument)  ################# (end Comment) ##########################################
+
+## Stage the data
+
+tajikistandtm <- DocumentTermMatrix(tajikistantext)   
+
+tajikistantdm <- TermDocumentMatrix(tajikistantext)   
+
+tajikistanfreq <- colSums(as.matrix(tajikistandtm)) 
+
+tajikistanfreq<-sort(tajikistanfreq, decreasing = TRUE)
+tajikistanfrequency<-head(tajikistanfreq, 20)
+
+tajikistanwf <- data.frame(tajikistanword=names(tajikistanfrequency), tajikistanfrequency=tajikistanfrequency)
+
+tajikistanwf$tajikistanword <- factor(tajikistanwf$tajikistanword, levels =  tajikistanwf$tajikistanword[order(tajikistanwf$tajikistanfreq, decreasing = TRUE)])
+```
+
+```{r Kyrgyzstan Term Frequency Setup , echo=FALSE}
+
+kyrgyzstantext <- Corpus(VectorSource(kyrgyzstan_texts_eng))
+kyrgyzstantext <- tm_map(kyrgyzstantext, removePunctuation)
+
+for(j in seq(kyrgyzstantext)) {     #######(start Comment) Is this part still necessary after file has been cleaned by Charlie's code?       
+  kyrgyzstantext[[j]] <- gsub("/", " ", kyrgyzstantext[[j]])   
+  kyrgyzstantext[[j]] <- gsub("@", " ", kyrgyzstantext[[j]])   
+  kyrgyzstantext[[j]] <- gsub("\\|", " ", kyrgyzstantext[[j]]) 
+} 
+
+kyrgyzstantext <- tm_map(kyrgyzstantext, removeNumbers)  
+kyrgyzstantext <- tm_map(kyrgyzstantext, tolower)
+kyrgyzstantext <- tm_map(kyrgyzstantext, removeWords, stopwords("english"))
+
+kyrgyzstantext <- tm_map(kyrgyzstantext, stemDocument) 
+kyrgyzstantext <- tm_map(kyrgyzstantext, stripWhitespace)
+
+kyrgyzstantext <- tm_map(kyrgyzstantext, PlainTextDocument)  ################# (end Comment) ##########################################
+
+## Stage the data
+
+kyrgyzstandtm <- DocumentTermMatrix(kyrgyzstantext)   
+
+kyrgyzstantdm <- TermDocumentMatrix(kyrgyzstantext)   
+
+kyrgyzstanfreq <- colSums(as.matrix(kyrgyzstandtm))   
+
+kyrgyzstanfreq<-sort(kyrgyzstanfreq, decreasing = TRUE)
+kyrgyzstanfrequency<-head(kyrgyzstanfreq, 20)
+
+kyrgyzstanwf <- data.frame(kyrgyzstanword=names(kyrgyzstanfrequency), kyrgyzstanfrequency=kyrgyzstanfrequency)
+
+kyrgyzstanwf$kyrgyzstanword <- factor(kyrgyzstanwf$kyrgyzstanword, levels =  kyrgyzstanwf$kyrgyzstanword[order(kyrgyzstanwf$kyrgyzstanfreq, decreasing = TRUE)])
+```
+
+```{r Serbia Term Frequency Setup , echo=FALSE}
+serbiatext <- Corpus(VectorSource(serbia_texts_eng))
+serbiatext <- tm_map(serbiatext, removePunctuation)
+
+for(j in seq(serbiatext)) {     #######(start Comment) Is this part still necessary after file has been cleaned by Charlie's code?       
+  serbiatext[[j]] <- gsub("/", " ", serbiatext[[j]])   
+  serbiatext[[j]] <- gsub("@", " ", serbiatext[[j]])   
+  serbiatext[[j]] <- gsub("\\|", " ", serbiatext[[j]]) 
+} 
+
+serbiatext <- tm_map(serbiatext, removeNumbers)  
+serbiatext <- tm_map(serbiatext, tolower)
+serbiatext <- tm_map(serbiatext, removeWords, stopwords("english"))
+
+# library(SnowballC)   
+serbiatext <- tm_map(serbiatext, stemDocument) 
+serbiatext <- tm_map(serbiatext, stripWhitespace)
+
+serbiatext <- tm_map(serbiatext, PlainTextDocument)  ################# (end Comment) ##########################################
+
+## Stage the data
+
+serbiadtm <- DocumentTermMatrix(serbiatext) 
+
+serbiatdm <- TermDocumentMatrix(serbiatext)   
+
+serbiafreq <- colSums(as.matrix(serbiadtm))   
+
+serbiafreq<-sort(serbiafreq, decreasing = TRUE)
+serbiafrequency<-head(serbiafreq, 20)
+
+serbiawf <- data.frame(serbiaword=names(serbiafrequency), serbiafrequency=serbiafrequency)
+
+serbiawf$serbiaword <- factor(serbiawf$serbiaword, levels =  serbiawf$serbiaword[order(serbiawf$serbiafreq, decreasing = TRUE)])
+```
+
+```{r Yemen Term Frequency Setup , echo=FALSE}
+
+yementext <- Corpus(VectorSource(yemen_texts_eng))
+yementext <- tm_map(yementext, removePunctuation)
+
+for(j in seq(yementext)) {     #######(start Comment) Is this part still necessary after file has been cleaned by Charlie's code?       
+  yementext[[j]] <- gsub("/", " ", yementext[[j]])   
+  yementext[[j]] <- gsub("@", " ", yementext[[j]])   
+  yementext[[j]] <- gsub("\\|", " ", yementext[[j]]) 
+} 
+
+yementext <- tm_map(yementext, removeNumbers)  
+yementext <- tm_map(yementext, tolower)
+yementext <- tm_map(yementext, removeWords, stopwords("english"))
+
+yementext <- tm_map(yementext, stemDocument) 
+yementext <- tm_map(yementext, stripWhitespace)
+
+yementext <- tm_map(yementext, PlainTextDocument)  ################# (end Comment) ##########################################
+
+## Stage the data
+
+yemendtm <- DocumentTermMatrix(yementext)   
+
+yementdm <- TermDocumentMatrix(yementext)   
+
+yemenfreq <- colSums(as.matrix(yemendtm))   
+
+yemenfreq<-sort(yemenfreq, decreasing = TRUE)
+yemenfrequency<-head(yemenfreq, 20)
+
+yemenwf <- data.frame(yemenword=names(yemenfrequency), yemenfrequency=yemenfrequency)
+
+yemenwf$yemenword <- factor(yemenwf$yemenword, levels =  yemenwf$yemenword[order(yemenwf$yemenfreq, decreasing = TRUE)])
+```
+
+```{r Unicef Term Frequency Setup , echo=FALSE}
+uniceftext <- Corpus(VectorSource(unicef_texts_eng))
+uniceftext <- tm_map(uniceftext, removePunctuation)
+
+for(j in seq(uniceftext)) {     #######(start Comment) Is this part still necessary after file has been cleaned by Charlie's code?       
+  uniceftext[[j]] <- gsub("/", " ", uniceftext[[j]])   
+  uniceftext[[j]] <- gsub("@", " ", uniceftext[[j]])   
+  uniceftext[[j]] <- gsub("\\|", " ", uniceftext[[j]]) 
+} 
+
+uniceftext <- tm_map(uniceftext, removeNumbers)  
+uniceftext <- tm_map(uniceftext, tolower)
+uniceftext <- tm_map(uniceftext, removeWords, stopwords("english"))
+
+uniceftext <- tm_map(uniceftext, stemDocument) 
+uniceftext <- tm_map(uniceftext, stripWhitespace)
+
+uniceftext <- tm_map(uniceftext, PlainTextDocument)  ################# (end Comment) ##########################################
+
+## Stage the data
+
+unicefdtm <- DocumentTermMatrix(uniceftext)   
+
+uniceftdm <- TermDocumentMatrix(uniceftext)   
+
+uniceffreq <- colSums(as.matrix(unicefdtm))   
+ 
+uniceffreq<-sort(uniceffreq, decreasing = TRUE)
+uniceffrequency<-head(uniceffreq, 20)
+
+unicefwf <- data.frame(unicefword=names(uniceffrequency), uniceffrequency=uniceffrequency)
+
+unicefwf$unicefword <- factor(unicefwf$unicefword, levels =  unicefwf$unicefword[order(unicefwf$uniceffreq, decreasing = TRUE)])
+```
+
+
+```{r WordCloud}
+
+renderPlot({  
+    wordcloud(names((get(paste0(input$FrequentTermsCountry, "freq")))), (get(paste0(input$FrequentTermsCountry, "freq"))), max.words = 30, scale=c(5, .1), random.color = FALSE, colors=brewer.pal(5, "Blues"))
+  })
+
+```
+
+### Bar chart {data-height=650}
+```{r  Frequent Terms}
+renderPlot({
+  ggplot(((get(paste0(input$FrequentTermsCountry,"wf")))), aes(((get(paste0(input$FrequentTermsCountry,"word")))),(get(paste0(input$FrequentTermsCountry ,"frequency"))))) + geom_bar(stat="identity") +
+  theme(axis.text.x=element_text(angle=45, hjust=1)) + ylab("Frequency") + xlab("Word") 
+})
+```
+
+
+Cluster Analysis
+=====================================
+
+Cluster Analysis {.sidebar}
+-------------------------------------
+
+```{r Cluster Analysis Inputs}
+selectInput("ClusterAnalysisCountry", label = "Select Country",
+            choices = c("Moldova" = "moldova", "Kyrgyzstan UNDP" = "kyrgyzstan", "Kyrgyzstan Unicef" = "unicef", "Serbia" = "serbia", 
+                        "Tajikistan" = "tajikistan", "Yemen" = "yemen"),
+            selected = "moldova")
+
+```
+
+>**CLUSTER ANALYSIS**
+> **Cluster dendogram**: Red line divides more frequent words in different clusters. Words in the same cluster are more likely to appear together in the same text.
+
+> **Cluster analysis**: another visualisation for clusters. Each color represents a different cluster. Words in the same clusters are more likely to appear together in the text. 
+
+Column
+------------------------------------
+
+### Dendogram {data-height=650}
+
+```{r Moldova Cluster Setup, include = FALSE}
+
+moldovadtmss <- removeSparseTerms(moldovadtm, 0.95) # This makes a matrix that is only 15% empty space, maximum.   
+# inspect(moldovadtmss) 
+
+# library(cluster)   
+moldovad <- dist(t(moldovadtmss), method="maximum")   
+moldovafit <- hclust(d=moldovad, method="ward")   
+# moldovafit   
+
+plot(moldovafit, hang=-1)  
+
+plot.new()
+plot(moldovafit, hang=-1)
+moldovagroups <- cutree(moldovafit, k=3)   # "k=" defines the number of clusters you are using   
+rect.hclust(moldovafit, k=3, border="red")
+
+# library(fpc)   
+moldovad <- dist(t(moldovadtmss), method="maximum")   
+moldovakfit <- kmeans(moldovad, 3)   
+
+moldovadoo <- skmeans_xdist(t(moldovadtmss))   
+moldovakfitoo <- skmeans(moldovadoo,3)
+
+```
+
+```{r Tajikistan Cluster Setup, include = FALSE}
+
+tajikistandtmss <- removeSparseTerms(tajikistandtm, 0.80) # This makes a matrix that is only 15% empty space, maximum.   
+
+tajikistand <- dist(t(tajikistandtmss), method="maximum")   
+tajikistanfit <- hclust(d=tajikistand, method="ward")   
+   
+plot(tajikistanfit, hang=-1)  
+
+plot.new()
+plot(tajikistanfit, hang=-1)
+tajikistangroups <- cutree(tajikistanfit, k=3)   # "k=" defines the number of clusters you are using   
+rect.hclust(tajikistanfit, k=3, border="red")
+
+# library(fpc)   
+tajikistand <- dist(t(tajikistandtmss), method="maximum")   
+tajikistankfit <- kmeans(tajikistand, 3)   
+
+tajikistandoo <- skmeans_xdist(t(tajikistandtmss))   
+tajikistankfitoo <- skmeans(tajikistandoo,3)
+```
+
+
+```{r Serbia Cluster Setup, include = FALSE}
+
+serbiadtmss <- removeSparseTerms(serbiadtm, 0.90) # This makes a matrix that is only 15% empty space, maximum.   
+
+serbiad <- dist(t(serbiadtmss), method="maximum")   
+serbiafit <- hclust(d=serbiad, method="ward")   
+   
+plot(serbiafit, hang=-1)  
+
+plot.new()
+plot(serbiafit, hang=-1)
+serbiagroups <- cutree(serbiafit, k=3)   # "k=" defines the number of clusters you are using   
+rect.hclust(serbiafit, k=3, border="red")
+
+# library(fpc)   
+serbiad <- dist(t(serbiadtmss), method="maximum")   
+serbiakfit <- kmeans(serbiad, 3)   
+
+serbiadoo <- skmeans_xdist(t(serbiadtmss))   
+serbiakfitoo <- skmeans(serbiadoo,3)
+```
+
+```{r Kyrgyzstan Cluster Setup, include = FALSE}
+
+kyrgyzstandtmss <- removeSparseTerms(kyrgyzstandtm, 0.91) # This makes a matrix that is only 15% empty space, maximum.   
+
+kyrgyzstand <- dist(t(kyrgyzstandtmss), method="maximum")   
+kyrgyzstanfit <- hclust(d=kyrgyzstand, method="ward")   
+   
+plot(kyrgyzstanfit, hang=-1)  
+
+plot.new()
+plot(kyrgyzstanfit, hang=-1)
+kyrgyzstangroups <- cutree(kyrgyzstanfit, k=3)   # "k=" defines the number of clusters you are using   
+rect.hclust(kyrgyzstanfit, k=3, border="red")
+
+# library(fpc)   
+kyrgyzstand <- dist(t(kyrgyzstandtmss), method="maximum")   
+kyrgyzstankfit <- kmeans(kyrgyzstand, 3)   
+
+kyrgyzstandoo <- skmeans_xdist(t(kyrgyzstandtmss))   
+kyrgyzstankfitoo <- skmeans(kyrgyzstandoo,3)
+```
+
+
+```{r Yemen Cluster Setup, include = FALSE}
+
+yemendtmss <- removeSparseTerms(yemendtm, 0.80) # This makes a matrix that is only 15% empty space, maximum.   
+
+yemend <- dist(t(yemendtmss), method="maximum")   
+yemenfit <- hclust(d=yemend, method="ward")   
+   
+plot(yemenfit, hang=-1)  
+
+plot.new()
+plot(yemenfit, hang=-1)
+yemengroups <- cutree(yemenfit, k=3)   # "k=" defines the number of clusters you are using   
+rect.hclust(yemenfit, k=3, border="red")
+
+# library(fpc)   
+yemend <- dist(t(yemendtmss), method="maximum")   
+yemenkfit <- kmeans(yemend, 3)   
+
+yemendoo <- skmeans_xdist(t(yemendtmss))   
+yemenkfitoo <- skmeans(yemendoo,3)
+```
+
+```{r Unicef Cluster Setup, include = FALSE}
+
+unicefdtmss <- removeSparseTerms(unicefdtm, 0.93) # This makes a matrix that is only 15% empty space, maximum.   
+
+unicefd <- dist(t(unicefdtmss), method="maximum")   
+uniceffit <- hclust(d=unicefd, method="ward")   
+
+plot(uniceffit, hang=-1)  
+
+plot.new()
+plot(uniceffit, hang=-1)
+unicefgroups <- cutree(uniceffit, k=3)   # "k=" defines the number of clusters you are using   
+rect.hclust(uniceffit, k=3, border="red")
+
+# library(fpc)   
+unicefd <- dist(t(unicefdtmss), method="maximum")   
+unicefkfit <- kmeans(unicefd, 3)   
+
+unicefdoo <- skmeans_xdist(t(unicefdtmss))   
+unicefkfitoo <- skmeans(unicefdoo,3)
+```
+
+```{r}
+renderPlot({
+    plot((get(paste0(input$ClusterAnalysisCountry, "fit"))), hang=-1)
+groups <- cutree((get(paste0(input$ClusterAnalysisCountry, "fit"))),k=3)   # "k=" defines the number of clusters you are using   
+rect.hclust((get(paste0(input$ClusterAnalysisCountry, "fit"))), k=3, border="red")
+})
+```
+
+### Cluster analysis {data-height=650}
+
+```{r}
+renderPlot({
+#   if (input$Country == "Moldova") {  
+# moldovad <- skmeans_xdist(t(moldovadtmss))   
+# moldovakfit <- skmeans(moldovad,3)   
+clusplot(as.matrix(get(paste0(input$ClusterAnalysisCountry, "doo"))), get(paste0(input$ClusterAnalysisCountry, "kfitoo"))$cluster, main = "CLUSTER ANALYSIS",
+         color=T, shade=T, labels=2, lines=0) 
+#  }
+})
+
+```
+
+
+Understanding Topics {data-navmenu="STM"}
+=====================================
+
+```{r STM Moldova Setup, include = FALSE, eval=TRUE}
+set.seed(67)
+temp<-textProcessor(documents=moldova$texts_eng,metadata=moldova)
+meta<-temp$meta
+vocab<-temp$vocab
+docs<-temp$documents
+out <- prepDocuments(docs, vocab, meta)
+docs<- out$documents
+vocab<-out$vocab
+moldovameta <-out$meta
+
+moldovameta$EntryDate <- as.numeric(moldovameta$EntryDate, format="%m/%d/%Y")
+moldovameta$DQ2.Gender <- as.factor(moldovameta$DQ2.Gender)
+moldovameta$DQ3.Education <- as.factor(moldovameta$DQ3.Education)
+moldovameta$DQ1.Age <- as.factor(moldovameta$DQ1.Age)
+
+moldovaSTM <- stm(docs, vocab, 12, prevalence  =~ DQ1.Age + EntryDate + DQ3.Education + DQ2.Gender + Q7.Score,  data = moldovameta) 
+
+```
+
+
+
+```{r STM Kyrgyzstan Setup, include = FALSE, eval = FALSE}
+set.seed(28)
+temp<-textProcessor(documents=kyrgyzstan$texts_eng,metadata=kyrgyzstan)
+meta<-temp$meta
+vocab<-temp$vocab
+docs<-temp$documents
+out <- prepDocuments(docs, vocab, meta)
+docs<-out$documents
+vocab<-out$vocab
+kyrgyzstanmeta <-out$meta
+
+
+kyrgyzstanmeta$Q7.Score <- as.factor(kyrgyzstanmeta$Q7.Score)
+kyrgyzstanmeta$DQ2.Gender <- as.factor(kyrgyzstanmeta$DQ2.Gender)
+kyrgyzstanmeta$EntryDate <- as.factor(as.Date(kyrgyzstanmeta$EntryDate, format="%m/%d/%Y"))
+kyrgyzstanmeta$DQ3.Education <- as.factor(kyrgyzstanmeta$DQ3.Education)
+kyrgyzstanmeta$DQ1.Age <- as.factor(kyrgyzstanmeta$DQ1.Age)
+names(kyrgyzstan)
+
+kyrgyzstanSTM <- stm(docs, vocab, 23, prevalence  =~ DQ1.Age + DQ2.Gender + DQ3.Education + Q7.Score, data = kyrgyzstanmeta) 
+```
+
+
+```{r STM Yemen Setup, include = FALSE, eval = FALSE}
+set.seed(17)
+temp<-textProcessor(documents=yemen$texts_eng,metadata=yemen)
+meta<-temp$meta
+vocab<-temp$vocab
+docs<-temp$documents
+out <- prepDocuments(docs, vocab, meta)
+docs<-out$documents
+vocab<-out$vocab
+yemenmeta <-out$meta
+
+
+yemenmeta$Q7.Score <- as.factor(yemenmeta$Q7.Score)
+yemenmeta$DQ1.Age <- as.factor(yemenmeta$DQ1.Age)
+yemenmeta$DQ4.Education. <- as.factor(yemenmeta$DQ4.Education.)
+yemenmeta$DQ2.Gender. <- as.factor(yemenmeta$DQ2.Gender.)
+yemenmeta$EntryDate <- as.numeric(yemenmeta$EntryDate)
+
+yemenSTM <- stm(docs, vocab,
+               K           = 23,
+               prevalence  =~ DQ1.Age + DQ1.Age + Q7.Score + DQ4.Education. + DQ2.Gender., data = yemenmeta)
+
+```
+
+
+```{r STM Serbia Setup, include = FALSE, eval = FALSE}
+set.seed(56)
+names(serbia)
+temp<-textProcessor(documents=serbia$texts_eng,metadata=serbia)
+meta<-temp$meta
+vocab<-temp$vocab
+docs<-temp$documents
+out <- prepDocuments(docs, vocab, meta)
+docs<-out$documents
+vocab<-out$vocab
+serbiameta <-out$meta
+
+serbiameta$DQ1.Gender <- as.factor(serbiameta$DQ1.Gender)
+serbiameta$EntryDate <- as.numeric(as.Date(serbiameta$EntryDate, format="%m/%d/%Y"))
+serbiameta$DQ6.Education <- as.factor(serbiameta$DQ6.Education)
+serbiameta$DQ5.Age <- as.factor(serbiameta$DQ5.Age)
+
+
+serbiaSTM <- stm(docs, vocab, 22, prevalence  =~ DQ5.Age + DQ1.Gender + EntryDate + DQ6.Education, data = serbiameta) 
+```
+
+
+```{r STM Tajikistan Setup, include = FALSE, eval = FALSE}
+set.seed(89)
+
+temp<-textProcessor(documents=tajikistan$texts_org,metadata=tajikistan)
+#Remeber to change to texts_eng when it works
+meta<-temp$meta
+vocab<-temp$vocab
+docs<-temp$documents
+out <- prepDocuments(docs, vocab, meta)
+docs<-out$documents
+vocab<-out$vocab
+tajikistanmeta <-out$meta
+
+tajikistanmeta$R1.Gender <- as.factor(tajikistanmeta$R1.Gender)
+tajikistanmeta$EntryDate <- as.Date(tajikistanmeta$EntryDate, format="%m/%d/%Y")
+tajikistanmeta$R2.Age <- as.factor(tajikistanmeta$R2.Age)
+tajikistanmeta$Q5.Score <- as.factor(tajikistanmeta$Q5.Score)
+
+
+tajikistanSTM <- stm(docs, vocab, 20, prevalence  =~ R2.Age + R1.Gender + EntryDate + Q5.Score, data = tajikistanmeta) 
+```
+
+
+```{r STM unicef Setup, include = FALSE, eval = FALSE}
+set.seed(76)
+temp<-textProcessor(documents=unicef$texts_eng,metadata=unicef)
+meta<-temp$meta
+vocab<-temp$vocab
+docs<-temp$documents
+out <- prepDocuments(docs, vocab, meta)
+docs<-out$documents
+vocab<-out$vocab
+unicefmeta <-out$meta
+
+unicefmeta$DQ2.Gender <- as.factor(unicefmeta$DQ2.Gender)
+unicefmeta$EntryDate <- as.Date(unicefmeta$EntryDate, format="%m/%d/%Y")
+unicefmeta$DQ1.Age <- as.factor(unicefmeta$DQ1.Age)
+unicefmeta$DQ3.Education <- as.factor(unicefmeta$DQ3.Education)
+
+unicefSTM <- stm(docs, vocab, 22, prevalence  =~ DQ1.Age + DQ2.Gender + EntryDate + DQ3.Education , data = unicefmeta) 
+```
+
+Understanding Topics {.sidebar}
+-------------------------------------
+  
+```{r}
+selectInput("STMCountry", label = "Select Country",
+            choices = c("Moldova" = "moldova", "Kyrgyzstan UNDP" = "kyrgyzstan", "Kyrgyzstan Unicef" = "unicef", "Serbia" = "serbia", 
+                        "Tajikistan" = "tajikistan", "Yemen" = "yemen"),
+            selected = "moldova")
+
+reactncountry <- reactive({
+  switch(input$STMCountry, "moldova"= {country<-1},
+         "kyrgyzstan"= {country<-2},
+         "serbia"= {country<-3},
+         "tajikistan"= {country<-4},
+         "yemen"= {country<-5},
+         "unicef"= {country<-6})
+})  
+
+
+renderUI({
+
+ncountry <- reactncountry()
+
+if (ncountry == 1) {
+  selectInput("STMTopics", label = "Select Topic",
+               choices = c("Topic 1", "Topic 2", "Topic 3", "Topic 4", 
+                           "Topic 5", "Topic 6", "Topic 7", "Topic 8", 
+                           "Topic 9", "Topic 10", "Topic 11", "Topic 12"), 
+               selected = 1)
+} else if (ncountry == 2) {
+  selectInput("STMTopics", label = "Select Topic",
+             choices = c("Topic 1", "Topic 2", "Topic 3", "Topic 4", 
+                         "Topic 5", "Topic 6", "Topic 7", "Topic 8", 
+                         "Topic 9", "Topic 10", "Topic 11", "Topic 12",
+                         "Topic 13", "Topic 14", "Topic 15", "Topic 16",
+                         "Topic 17", "Topic 18", "Topic 19", "Topic 20",
+                         "Topic 21", "Topic 22"), 
+             selected = 1)
+} else if (ncountry == 3) {
+  selectInput("STMTopics", label = "Select Topic",
+             choices = c("Topic 1", "Topic 2", "Topic 3", "Topic 4", 
+                         "Topic 5", "Topic 6", "Topic 7", "Topic 8", 
+                         "Topic 9", "Topic 10", "Topic 11", "Topic 12",
+                         "Topic 13", "Topic 14", "Topic 15", "Topic 16",
+                         "Topic 17", "Topic 18", "Topic 19", "Topic 20",
+                         "Topic 21", "Topic 22", "Topic 23"), 
+             selected = 1)
+} else if (ncountry == 4) {
+  selectInput("STMTopics", label = "Select Topic",
+             choices = c("Topic 1", "Topic 2", "Topic 3", "Topic 4", 
+                         "Topic 5", "Topic 6", "Topic 7", "Topic 8", 
+                         "Topic 9", "Topic 10", "Topic 11", "Topic 12",
+                         "Topic 13", "Topic 14", "Topic 15", "Topic 16",
+                         "Topic 17", "Topic 18", "Topic 19", "Topic 20"), 
+             selected = 1)
+} else if (ncountry == 5) {
+  selectInput("STMTopics", label = "Select Topic",
+             choices = c("Topic 1", "Topic 2", "Topic 3", "Topic 4", 
+                         "Topic 5", "Topic 6", "Topic 7", "Topic 8", 
+                         "Topic 9", "Topic 10", "Topic 11", "Topic 12",
+                         "Topic 13", "Topic 14", "Topic 15", "Topic 16",
+                         "Topic 17", "Topic 18", "Topic 19", "Topic 20",
+                         "Topic 21", "Topic 22", "Topic 23"), 
+             selected = 1)
+} else if (ncountry == 6) {
+  selectInput("STMTopics", label = "Select Topic",
+             choices = c("Topic 1", "Topic 2", "Topic 3", "Topic 4", 
+                         "Topic 5", "Topic 6", "Topic 7", "Topic 8", 
+                         "Topic 9", "Topic 10", "Topic 11", "Topic 12",
+                         "Topic 13", "Topic 14", "Topic 15", "Topic 16",
+                         "Topic 17", "Topic 18", "Topic 19", "Topic 20",
+                         "Topic 21", "Topic 22"), 
+             selected = 1)
+}
+})
+
+reactntopics <- reactive({
+  switch(input$STMTopics, "Topic 1"= {topics <- 1},
+         "Topic 2"= {topics <- 2},
+         "Topic 3"= {topics <- 3},
+         "Topic 4"= {topics <- 4},
+         "Topic 5"= {topics <- 5},
+         "Topic 6"= {topics <- 6},
+         "Topic 7"= {topics <- 7},
+         "Topic 8"= {topics <- 8},
+         "Topic 9"= {topics <- 9},
+         "Topic 10"= {topics <- 10},
+         "Topic 11"= {topics <- 11},
+         "Topic 12"= {topics <- 12},
+         "Topic 13"= {topics <- 13},
+         "Topic 14"= {topics <- 14},
+         "Topic 15"= {topics <- 15},
+         "Topic 16"= {topics <- 16},
+         "Topic 17"= {topics <- 17},
+         "Topic 18"= {topics <- 18},
+         "Topic 19"= {topics <- 19},
+         "Topic 20"= {topics <- 20},
+         "Topic 21"= {topics <- 21},
+         "Topic 22"= {topics <- 22},
+         "Topic 23"= {topics <- 23})
+})  
+
+```
+
+Topic Labels {data-height=250}
+-------------------------------------
+
+### Topic Labels
+
+
+```{r, echo = FALSE}
+
+renderPrint({
+  ntopics <- reactntopics()
+  
+  labelTopics(get(paste0(input$STMCountry, "STM")), topics = ntopics, n = 16, frexweight = 0.5)
+})
+```
+
+Topic Wordcloudsand Representative Stories {data-height=750}
+-------------------------------------
+  
+### Topic Wordcloud
+  
+```{r, echo=FALSE}
+renderPlot({
+  
+  ntopics <- reactntopics()
+  
+  cloud(get(paste0(input$STMCountry, "STM")), topic = ntopics, type=c("model", "documents"))
+})
+
+```
+
+### Most Representative Stories
+
+```{r, echo=FALSE}
+
+renderPlot({
+  ntopics <- reactntopics()
+  plot(findThoughts(get(paste0(input$STMCountry, "STM")), texts = as.character(get(paste0(input$STMCountry, "meta"))$texts_eng), topics = ntopics, n=3) , width = 75)
+})
+
+```
+
+Topic Exploration {data-navmenu="STM"} 
+=====================================
+  
+Topic Exploration {.sidebar}
+-------------------------------------
+  
+```{r}
+selectInput("BrowserCountry", label = "Select Country",
+            choices = c("Moldova" = "moldova", "Kyrgyzstan UNDP" = "kyrgyzstan", "Kyrgyzstan Unicef" = "unicef", "Serbia" = "serbia", 
+                        "Tajikistan" = "tajikistan", "Yemen" = "yemen"),
+            selected = "moldova")
+
+```
+
+STM Browser {data-width=1000}
+-------------------------------------
+  
+### Topic modelling
+```{r, echo=FALSE, eval = TRUE}
+stmBrowser_widget(moldovaSTM, data=moldovameta, c("EntryDate","DQ1.Age","DQ3.Education", "DQ2.Gender", "Q7.Score"),text="texts_eng", labeltype='frex') 
+```
+
+Key Words and Associations
+=====================================
+
+Key Words and Associations {.sidebar}
+-------------------------------------
+  
+```{r}
+selectInput("Country", label = "Select Country",
+            choices = c("Moldova" = "moldova", "Kyrgyzstan UNDP" = "kyrgyzstan", "Kyrgyzstan Unicef" = "unicef", "Serbia" = "serbia", 
+                        "Tajikistan" = "tajikistan", "Yemen" = "yemen"),
+            selected = "moldova")
+```
+Search for words you are interested in 
+
+```{r}
+textInput("Input", label = NULL, value = "job", placeholder = "e.g. job")
+```
+
+
+Column 
+-------------------------------------
+
+### Key Words in Context
+    
+```{r KWIC Plot, fig.width=8, fig.height=7, echo = FALSE}
+renderTable({
+    KWICObject <- as.data.frame(kwic(get(paste0(input$Country, "_corpus")), input$Input, window = 14)[,3:5])
+    colnames(KWICObject) <- c("Context Pre", "Key Word", "Context Post")
+    print(KWICObject, row.names = FALSE)
+})
+```
+   
+
+### Word Associations
+
+```{r WA Plot, fig.width=2, fig.height=7, echo = FALSE}
+renderTable({
+  WAObject <- as.data.frame(findAssocs(get(paste0(input$Country,"tdm")), input$Input,0.2))
+  print(WAObject, row.names = FALSE)
+})
+```
+
+
+Triads {data-orientation=rows}
+=====================================
+
+
+TRIADS {.sidebar}
+-------------------------------------
+
+```{r}
+
+
+selectInput("CountryT", label = "Select Country",
+            choices = c("Moldova", "Kyrgyzstan", "Serbia", "Tajikistan", "Yemen", "Kyrgyzstan Unicef"), selected = "Moldova")
+
+
+selectInput("Variable", label = "Select variable",
+            choices = c("Feeling", "Age", "Gender", "Employment", "Education", "Live",
+                        "Marital", "Group"), selected = "Feeling")
+
+reactncountryT <- reactive({
+  switch(input$CountryT, "Kyrgyzstan" = {ncountry<-1},"Moldova" = {ncountry<-2},
+         "Kyrgyzstan Unicef" = {ncountry<-3}, "Serbia" = {ncountry<-4},
+          "Tajikistan" = {ncountry<-5}, "Yemen" = {ncountry<-6})
+})
+
+``` 
+
+Row
+-------------------------------------
+
+### TRIADS
+
+```{r triadall, echo=FALSE, include=TRUE}
+
+renderPlot({
+  
+  ncountry <- reactncountryT()
+  varname <- input$Variable
+  
+  Ntriads <- length(Country[[ncountry]]$var_triads)
+  p_all <- array(list(),Ntriads)
+  
+  for (ntriads in 1:Ntriads)
+    p_all[[ntriads]] <- mytriad(data,Country,ncountry,varname,ntriads)
+  
+  
+  # ptm <- proc.time()
+  do.call("grid.arrange",p_all)
+  # print(proc.time()-ptm)
+  
+  
+}) # end of RenderPlot
+
+```
+
+
+
+FAQ and About
+==========================================
+**ABOUT**
+
+BECCA is the result of a collaborative project between postgraduate students at University College London and the United Nations Development Programme. The aim of the project is to create a tool that enable analysts to easily preform advanced statistical analysis of SenseMaker® data from the UNDP and Cognitive Edge's Fragments of Impact project. BECCA is the students' dissertation project. It was supervised by Dr Slava Mikhaylov.
+
+The creators of BECCA are: 
+Elena Cora Magrini, MSc International Public Policy, elena.magrini.15@alumni.ucl.ac.uk
+Chiara Amato, MSc International Public Policy, chiara.amato.15@alumni.ucl.ac.uk. 
+Charlie Mealings, MSc Global Governance, charles.mealings.15@alumni.ucl.ac.uk. 
+Benjamin Vigreux, MSc International Public Policy, benjamin.vigreux.15@alumni.ucl.ac.uk. 
+Andreas Karmhus, MSc International Public Policy, andreas.karmhus.15@alumni.ucl.ac.uk
+
+
+**WORLD MAP**
+
+The first page displays a map which countries are included in BECCA and the average feeling of the respondents with regards to the narrative they have told. It is important to note that respondents were sharing narratives about widely different issues, so cross national comparison of average feeling doesn't necessarily make sense.  
+
+
+**FEELING OVER TIME**
+
+Three main charts are displayed on this page. Before interacting with them, select the country data that you wish to explore in the sidebar on the left. Furthermore, you may wish to observe trends over certain periods of time (e.g. on a weekly, bi-weekly, or monthly basis). This is what the "window length (days) slider allows you to define. For example, selecting 7 days provides weekly trends, 14 days provides bi-weekly trends, 30 days provides monthly trends, etc. By default, this value is set at 7 days. Percentage of Positive, Neutral and Negative Stories Over Time.                This chart allows you to observe time trends in the percentage stories that are qualified as positive, neutral and negative by their authors. Using the checkboxes in the sidebar on the left, you may wish to filter out certain types of stories. The percentage of positive, neutral and negative stories over time may allow you to gauge evolutions in the general feeling of local populations. 
+
+**MEAN TREND**
+
+The mean trend chart provides a mean score (from -1 to 1, where -1 is extremely negative and 1 is extremely positive) based on the proportion of positive, neutral and negative stories at each date interval. In order to obtain this score, negative stories were coded as "-1", neutral stories as "0" and positive stories as "1". Once again, this graph provides an insight into the evolution of populations' general feeling.
+
+
+**LIKERT PLOT**
+
+Similarly to the percentage of positive, neutral and negative stories over time plot, this Likert plot provides a breakdown of the percentage of positive, neutral and negative stories recorded for each date interval. To the right the Likert plot, you will find a histogram specifying the absolute number of stories collected at each date interval. 
+
+**DESCRIPTIVE**
+
+ddddgr
+
+**FREQUENT TERMS** 
+
+The frequent terms page gives a broad overview of the most frequent terms that appear in each country dataset. Two main charts are displayed on this page. Before interacting with them, select the country data that you wish to explore in the sidebar on the left. Note that numbers have been removed, all words have been set to lowercase and 'stop words' (words that are frequently used but have little conceptual meaning, such as "and", "the", or "a") have been removed.Furthermore, words have been "stemmed" (e.g. words like "politics", "politicians", "political" have all been group by their same root "politic").
+
+**Wordcluds**: Visualization tool showing the most frequent words appearing in the data. The bigger the word, the more frequent it is.
+
+**Bar chart**: This histogram provides a bit more information on the most frequent terms used throughout the stories of the country dataset collected. It lists the most frequent words in descending order, along with the number of times they appear in the data.
+
+Read more about wordclouds and frequency plot at the following link: https://rstudio-pubs-static.s3.amazonaws.com/31867_8236987cf0a8444e962ccd2aec46d9c3.html
+
+**CLUSTER ANALYSIS**
+
+The cluster analysis page gives a broad overview of how the different words come up in the text in each different country. Two main charts are displayed on this page. Before interacting with them, select the country data that you wish to explore in the sidebar on the left. Note that numbers have been removed, all words have been set to lowercase and 'stop words' (words that are frequently used but have little conceptual meaning, such as "and", "the", or "a") have been removed.Furthermore, words have been "stemmed" (e.g. words like "politics", "politicians", "political" have all been group by their same root "politic").
+
+**Cluster dendogram**: using hierarchical cluster analysis with maximum distance, it is possible to see how different stories group together. Different clusters are identified by the different groupings made by the red lines. 
+
+**Cluster analysis**: another visualisation for clusters. This time spherical k-means have been used to reduce the sparsity present in the data. Different clusters show how different words are likely to appear in similar texts. Hence, words that are on the same group color are more likely to appear together in the same text.
+
+Read more about dendograms and cluster analysis at the following link:https://rstudio-pubs-static.s3.amazonaws.com/31867_8236987cf0a8444e962ccd2aec46d9c3.html
+Read more about sparse data at the following link: http://www.cs.utexas.edu/users/inderjit/public_papers/concept_mlj.pdf
+
+
+**UNDERSTANDING TOPICS**
+
+Structural topic modelling is a form of topic modelling, which itself is a statistical model from machine learning and natural language processing. It discovers underlying topics in textual data. BECCA assigns the different micro narratives to a number of abstract topics. On the "Understand topics" page you can attempt to understand what the different topics are about and whether they are useful in your analysis."Higest prob" shows words with highest probability of being within a topic. "Frex" shows frequent and exclusive words within a topic. Therefore, while two topics might share high probability words, the likelihood for sharing "frex" words is less. "Lift" and "score" are other measures that are not relevant, unless you have experience with topic modeling.                             The word cloud graphically visualize a topic. The larger the displayed word are,  the more common they are in the text.The text on the right show three documents that the model assumes to be representative of the topic.      You can find more information about Structural Topic Modeling and read academic papers utilizing it here: http://structuraltopicmodel.com/
+
+**EXPLORE TOPICS**
+
+STM Brower is an interactive D3 visualisation created by Freeman, Chuang, Roberts, Stewart and Tingley (2015) (see: https://github.com/mroberts/stmBrowser) , that helps you explore the topics in the text and metadata covariate relationships (for example gender, education, etc.). Narratives will be displayed on the right side if you click on them. Narratives can be placed within multiple topics, so they are rarely fully within a single topic.
+
+**KEY WORDS IN CONTEXT** 
+
+The search bar on the left lets you search for words you are interested in and look at the sentences and words that surround them (their context). Please note that you can use a star to improve your search with words that share a number of letters, for example you can write pro* and you will get contexts for project and professional and such. Finally, when the interface says "Error: incorrect number of dimensions", what you have searched for can not be found in the data.
+
+**WORD ASSOCIATIONS** 
+
+The search bar on the left lets you search for words you are interested in and see if they are associated (correlate) with other words in the data. The minimum correaltion for a word being displayed is 0.2
+
+
+**TRIADS/TRIANGLES** 
+
+Ternary plots show how the respondents answer with three dimensions. 
